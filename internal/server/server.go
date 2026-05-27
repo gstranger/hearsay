@@ -42,6 +42,7 @@ func New(client *hearsay.Client, provider hearsay.Provider, locking bool, authTo
 	s.mux.HandleFunc("GET /claims", s.handleQueryClaims)
 	s.mux.HandleFunc("GET /check", s.handleCheck)
 	s.mux.HandleFunc("GET /mailbox", s.handleGetMailbox)
+	s.mux.HandleFunc("GET /events", s.handleSSE)
 	// Mutating endpoints (auth required when token is set, rate-limited)
 	s.mux.HandleFunc("POST /claim", s.rateLimit.Wrap(s.auth.Wrap(s.handleClaim)))
 	s.mux.HandleFunc("POST /release", s.rateLimit.Wrap(s.auth.Wrap(s.handleRelease)))

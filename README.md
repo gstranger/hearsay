@@ -69,14 +69,20 @@ provider = "sqlite"
 ### Start the Server
 
 ```bash
-# REST API only (default port 8080)
+# REST API only (default port 8080, HTTP)
 hearsay serve
 
-# With authentication and structured logging
-hearsay serve --auth-token my-secret-key --log-format json
+# With HTTPS using auto-generated self-signed cert
+hearsay serve --tls-auto
 
-# With A2A server on separate port
-hearsay serve --a2a-addr localhost:8081 --a2a-api-key my-secret-key
+# With HTTPS using your own cert
+hearsay serve --tls-cert server.crt --tls-key server.key
+
+# With authentication, structured logging, and HTTPS
+hearsay serve --auth-token my-secret-key --log-format json --tls-auto
+
+# With A2A server on separate port (HTTPS)
+hearsay serve --a2a-addr localhost:8081 --a2a-api-key my-secret-key --tls-auto
 ```
 
 ### Claim a Resource

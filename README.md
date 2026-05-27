@@ -220,6 +220,47 @@ See [sdk/typescript/README.md](sdk/typescript/README.md) for TypeScript client u
 
 ---
 
+## Integrations
+
+### IDE Extensions
+
+hearsay ships with extensions for popular coding agents that automatically claim files before editing and release them when done.
+
+| Extension | Agent | Setup |
+|---|---|---|
+| **Cursor** | Cursor IDE | Copy `sdk/cursor/hooks.json` to `.cursor/hooks.json` |
+| **OpenCode** | OpenCode CLI | Copy `sdk/opencode-extension/hearsay.ts` to `.opencode/plugins/` |
+| **Pi** | Pi Coding Agent | Copy `sdk/pi-extension/hearsay.ts` to `.pi/extensions/` |
+
+Each extension auto-starts `hearsay serve` and runs `hearsay init` if needed.
+
+### TypeScript SDK
+
+```bash
+npm install @gstranger/hearsay
+```
+
+```typescript
+import { HearsayClient, createHooks } from '@gstranger/hearsay';
+
+const client = new HearsayClient('http://localhost:8080');
+const hooks = createHooks(client, { autoHeartbeat: true });
+
+// Automatically claim before tool use, release after
+```
+
+See [sdk/typescript/](sdk/typescript/) for full docs.
+
+### Agent Skills
+
+| Skill | Location | Purpose |
+|---|---|---|
+| **Coordination Etiquette** | `skills/coordination-etiquette/` | Teaches agents how to query claims, write descriptive intents, and cooperate with other agents |
+
+Load it into any coding agent to make it coordination-aware.
+
+---
+
 ## Configuration
 
 ### Environment Variables

@@ -1,3 +1,5 @@
+//go:build !wasm
+
 package managed
 
 import (
@@ -114,9 +116,51 @@ func (p *Provider) Subscribe(ctx context.Context, namespaceID string, from hears
 	return ch, nil
 }
 
-// SubscribeEvents returns a channel that emits events. Not yet implemented for managed provider.
+// SubscribeEvents streams coordination events using polling against the remote server.
 func (p *Provider) SubscribeEvents(ctx context.Context, namespaceID string, since int64) (<-chan hearsay.Event, error) {
-	return nil, fmt.Errorf("SubscribeEvents not yet implemented for managed provider")
+	ch := make(chan hearsay.Event, 100)
+	go func() {
+		defer close(ch)
+		for {
+			select {
+			case <-time.After(500 * time.Millisecond):
+			case <-ctx.Done():
+				return
+			}
+			msgs, err := p.Query(ctx, namespaceID, hearsay.QueryOpts{Since: hearsay.Offset(since)})
+			if err != nil {
+				continue
+			}
+			for _, m := range msgs {
+				evt := hearsay.Event{
+					Seq:       m.Offset,
+					Type:      msgTypeToEvent(m.Type),
+					Payload:   m.Payload,
+					Timestamp: m.Timestamp,
+				}
+				select {
+				case ch <- evt:
+					since = m.Offset
+				case <-ctx.Done():
+					return
+				}
+			}
+		}
+	}()
+	return ch, nil
+}
+
+func msgTypeToEvent(t hearsay.MessageType) hearsay.EventType {
+	switch t {
+	case hearsay.MsgClaim:
+		return hearsay.EventClaim
+	case hearsay.MsgRelease:
+		return hearsay.EventRelease
+	case hearsay.MsgHeartbeat:
+		return hearsay.EventHeartbeat
+	default:
+		return hearsay.EventType(t)
+	}
 }
 
 func (p *Provider) ActiveClaims(ctx context.Context, namespaceID string, resourcePattern string) ([]hearsay.Claim, error) {

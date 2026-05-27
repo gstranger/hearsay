@@ -1,3 +1,5 @@
+//go:build !wasm
+
 package postgres
 
 import (
@@ -39,12 +41,14 @@ func (p *Provider) migrate() error {
 		)`,
 		`CREATE TABLE IF NOT EXISTS messages (
 			"offset" BIGSERIAL PRIMARY KEY,
+			seq BIGINT,
 			type TEXT NOT NULL,
 			namespace TEXT NOT NULL,
 			agent_id TEXT,
 			payload JSONB,
 			timestamp TIMESTAMPTZ NOT NULL DEFAULT NOW()
 		)`,
+		`ALTER TABLE messages ADD COLUMN IF NOT EXISTS seq BIGINT`,
 		`CREATE INDEX IF NOT EXISTS idx_messages_ns ON messages(namespace)`,
 		`CREATE INDEX IF NOT EXISTS idx_messages_ts ON messages(timestamp)`,
 		`CREATE TABLE IF NOT EXISTS mailbox_messages (
@@ -167,17 +171,25 @@ func (p *Provider) Append(ctx context.Context, namespaceID string, msgs []hearsa
 		return err
 	}
 	defer tx.Rollback()
+
+	var nextSeq int64
+	err = tx.QueryRowContext(ctx, `SELECT COALESCE(MAX(seq), 0) + 1 FROM messages WHERE namespace = $1`, namespaceID).Scan(&nextSeq)
+	if err != nil {
+		return err
+	}
+
 	for i := range msgs {
 		if msgs[i].Timestamp.IsZero() {
 			msgs[i].Timestamp = time.Now()
 		}
 		_, err := tx.ExecContext(ctx,
-			`INSERT INTO messages (type, namespace, agent_id, payload, timestamp) VALUES ($1, $2, $3, $4, $5)`,
-			msgs[i].Type, namespaceID, msgs[i].AgentID, string(msgs[i].Payload), msgs[i].Timestamp,
+			`INSERT INTO messages (seq, type, namespace, agent_id, payload, timestamp) VALUES ($1, $2, $3, $4, $5, $6)`,
+			nextSeq, msgs[i].Type, namespaceID, msgs[i].AgentID, string(msgs[i].Payload), msgs[i].Timestamp,
 		)
 		if err != nil {
 			return err
 		}
+		nextSeq++
 	}
 	return tx.Commit()
 }
@@ -257,9 +269,98 @@ func (p *Provider) Subscribe(ctx context.Context, namespaceID string, from hears
 	return ch, nil
 }
 
-// SubscribeEvents returns a channel that emits events. Not yet implemented for PostgreSQL.
+// SubscribeEvents streams coordination events with sequence numbers for SSE.
 func (p *Provider) SubscribeEvents(ctx context.Context, namespaceID string, since int64) (<-chan hearsay.Event, error) {
-	return nil, fmt.Errorf("SubscribeEvents not yet implemented for PostgreSQL")
+	ch := make(chan hearsay.Event, 100)
+	go func() {
+		defer close(ch)
+
+		// Replay: catch up on events since the given sequence
+		rows, err := p.db.QueryContext(ctx,
+			`SELECT seq, type, payload, timestamp FROM messages WHERE namespace = $1 AND seq > $2 ORDER BY seq`,
+			namespaceID, since)
+		if err != nil {
+			return
+		}
+		var currentSeq int64 = since
+		for rows.Next() {
+			var seq int64
+			var msgType string
+			var payload []byte
+			var ts time.Time
+			if err := rows.Scan(&seq, &msgType, &payload, &ts); err != nil {
+				continue
+			}
+			evt := hearsay.Event{
+				Seq:       seq,
+				Type:      msgTypeToEvent(msgType),
+				Payload:   json.RawMessage(payload),
+				Timestamp: ts,
+			}
+			select {
+			case ch <- evt:
+				currentSeq = seq
+			case <-ctx.Done():
+				rows.Close()
+				return
+			}
+		}
+		rows.Close()
+		since = currentSeq
+
+		// Stream: poll for new events
+		for {
+			select {
+			case <-time.After(500 * time.Millisecond):
+			case <-ctx.Done():
+				return
+			}
+
+			rows, err := p.db.QueryContext(ctx,
+				`SELECT seq, type, payload, timestamp FROM messages WHERE namespace = $1 AND seq > $2 ORDER BY seq`,
+				namespaceID, since)
+			if err != nil {
+				continue
+			}
+			for rows.Next() {
+				var seq int64
+				var msgType string
+				var payload []byte
+				var ts time.Time
+				if err := rows.Scan(&seq, &msgType, &payload, &ts); err != nil {
+					continue
+				}
+				evt := hearsay.Event{
+					Seq:       seq,
+					Type:      msgTypeToEvent(msgType),
+					Payload:   json.RawMessage(payload),
+					Timestamp: ts,
+				}
+				select {
+				case ch <- evt:
+					since = seq
+				case <-ctx.Done():
+					rows.Close()
+					return
+				}
+			}
+			rows.Close()
+		}
+	}()
+	return ch, nil
+}
+
+func msgTypeToEvent(t string) hearsay.EventType {
+	switch hearsay.MessageType(t) {
+	case hearsay.MsgClaim:
+		return hearsay.EventClaim
+	case hearsay.MsgRelease:
+		return hearsay.EventRelease
+	case hearsay.MsgHeartbeat:
+		return hearsay.EventHeartbeat
+	default:
+		return hearsay.EventType(t)
+	}
 }
 
 func (p *Provider) ActiveClaims(ctx context.Context, namespaceID string, resourcePattern string) ([]hearsay.Claim, error) {

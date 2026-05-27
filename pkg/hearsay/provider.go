@@ -36,6 +36,11 @@ type Provider interface {
 
 	// AppendAudit persists audit events to the audit log.
 	AppendAudit(ctx context.Context, namespaceID string, events []AuditEvent) error
+
+	// SubscribeEvents returns a channel of coordination events for the namespace,
+	// starting from the given sequence number. If since is 0, only new events
+	// are streamed (no replay). The channel is closed when ctx is cancelled.
+	SubscribeEvents(ctx context.Context, namespaceID string, since int64) (<-chan Event, error)
 }
 
 type Namespace struct {
@@ -69,6 +74,25 @@ type QueryOpts struct {
 	AgentID string
 	Limit   int
 }
+
+// Event represents a streamed coordination event with a monotonic sequence number
+// that clients use for SSE reconnection without missing events.
+type Event struct {
+	Seq       int64           `json:"seq"`
+	Type      EventType       `json:"type"`
+	Payload   json.RawMessage `json:"payload"`
+	Timestamp time.Time       `json:"timestamp"`
+}
+
+// EventType categorizes streamed events for SSE clients.
+type EventType string
+
+const (
+	EventClaim     EventType = "claim"
+	EventRelease   EventType = "release"
+	EventHeartbeat EventType = "heartbeat"
+	EventMailbox   EventType = "mailbox_send"
+)
 
 type AgentState struct {
 	AgentID      string

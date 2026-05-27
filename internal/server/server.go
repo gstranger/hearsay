@@ -11,22 +11,24 @@ import (
 )
 
 type Server struct {
-	client   *hearsay.Client
-	provider hearsay.Provider
-	locking  bool
-	mux      *http.ServeMux
-	auth     *AuthMiddleware
-	logger   *LoggingMiddleware
+	client    *hearsay.Client
+	provider  hearsay.Provider
+	locking   bool
+	mux       *http.ServeMux
+	auth      *AuthMiddleware
+	logger    *LoggingMiddleware
+	rateLimit *RateLimiter
 }
 
-func New(client *hearsay.Client, provider hearsay.Provider, locking bool, authToken string, logFormat LogFormat) *Server {
+func New(client *hearsay.Client, provider hearsay.Provider, locking bool, authToken string, logFormat LogFormat, rateLimit, rateBurst int) *Server {
 	s := &Server{
-		client:   client,
-		provider: provider,
-		locking:  locking,
-		mux:      http.NewServeMux(),
-		auth:     &AuthMiddleware{Token: authToken},
-		logger:   &LoggingMiddleware{Format: logFormat},
+		client:    client,
+		provider:  provider,
+		locking:   locking,
+		mux:       http.NewServeMux(),
+		auth:      &AuthMiddleware{Token: authToken},
+		logger:    &LoggingMiddleware{Format: logFormat},
+		rateLimit: NewRateLimiter(rateLimit, rateBurst),
 	}
 	// Read-only endpoints (no auth required)
 	s.mux.HandleFunc("GET /health", func(w http.ResponseWriter, r *http.Request) {
@@ -36,19 +38,19 @@ func New(client *hearsay.Client, provider hearsay.Provider, locking bool, authTo
 	s.mux.HandleFunc("GET /claims", s.handleQueryClaims)
 	s.mux.HandleFunc("GET /check", s.handleCheck)
 	s.mux.HandleFunc("GET /mailbox", s.handleGetMailbox)
-	// Mutating endpoints (auth required when token is set)
-	s.mux.HandleFunc("POST /claim", s.auth.Wrap(s.handleClaim))
-	s.mux.HandleFunc("POST /release", s.auth.Wrap(s.handleRelease))
-	s.mux.HandleFunc("POST /heartbeat", s.auth.Wrap(s.handleHeartbeat))
-	s.mux.HandleFunc("POST /intent", s.auth.Wrap(s.handleIntent))
-	s.mux.HandleFunc("POST /message", s.auth.Wrap(s.handleSendMessage))
-	s.mux.HandleFunc("POST /message/read", s.auth.Wrap(s.handleMarkRead))
-	s.mux.HandleFunc("POST /message/archive", s.auth.Wrap(s.handleArchiveMessage))
+	// Mutating endpoints (auth required when token is set, rate-limited)
+	s.mux.HandleFunc("POST /claim", s.rateLimit.Wrap(s.auth.Wrap(s.handleClaim)))
+	s.mux.HandleFunc("POST /release", s.rateLimit.Wrap(s.auth.Wrap(s.handleRelease)))
+	s.mux.HandleFunc("POST /heartbeat", s.rateLimit.Wrap(s.auth.Wrap(s.handleHeartbeat)))
+	s.mux.HandleFunc("POST /intent", s.rateLimit.Wrap(s.auth.Wrap(s.handleIntent)))
+	s.mux.HandleFunc("POST /message", s.rateLimit.Wrap(s.auth.Wrap(s.handleSendMessage)))
+	s.mux.HandleFunc("POST /message/read", s.rateLimit.Wrap(s.auth.Wrap(s.handleMarkRead)))
+	s.mux.HandleFunc("POST /message/archive", s.rateLimit.Wrap(s.auth.Wrap(s.handleArchiveMessage)))
 	// Provider proxy endpoints
-	s.mux.HandleFunc("POST /namespaces/create", s.auth.Wrap(s.handleCreateNamespace))
-	s.mux.HandleFunc("POST /namespaces/delete", s.auth.Wrap(s.handleDeleteNamespace))
-	s.mux.HandleFunc("POST /append", s.auth.Wrap(s.handleAppend))
-	s.mux.HandleFunc("POST /expire", s.auth.Wrap(s.handleReleaseExpired))
+	s.mux.HandleFunc("POST /namespaces/create", s.rateLimit.Wrap(s.auth.Wrap(s.handleCreateNamespace)))
+	s.mux.HandleFunc("POST /namespaces/delete", s.rateLimit.Wrap(s.auth.Wrap(s.handleDeleteNamespace)))
+	s.mux.HandleFunc("POST /append", s.rateLimit.Wrap(s.auth.Wrap(s.handleAppend)))
+	s.mux.HandleFunc("POST /expire", s.rateLimit.Wrap(s.auth.Wrap(s.handleReleaseExpired)))
 	// Read-only provider endpoints
 	s.mux.HandleFunc("GET /query", s.handleQuery)
 	s.mux.HandleFunc("GET /agents", s.handleAgentState)

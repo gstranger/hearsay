@@ -324,6 +324,8 @@ func cmdServe(args []string) {
 	tlsCert := fs.String("tls-cert", "", "Path to TLS certificate file")
 	tlsKey := fs.String("tls-key", "", "Path to TLS private key file")
 	tlsAuto := fs.Bool("tls-auto", false, "Auto-generate self-signed TLS certificate")
+	rateLimit := fs.Int("rate-limit", 0, "Max requests per second per agent (0 = unlimited)")
+	rateBurst := fs.Int("rate-burst", 10, "Max burst size per agent")
 	fs.Parse(args)
 
 	cfg, err := hearsay.LoadConfig(".hearsay.toml")
@@ -405,7 +407,7 @@ func cmdServe(args []string) {
 		}
 	}
 
-	srv := server.New(client, provider, cfg.Defaults.Locking, *authToken, logFmt)
+	srv := server.New(client, provider, cfg.Defaults.Locking, *authToken, logFmt, *rateLimit, *rateBurst)
 
 	httpSrv := &http.Server{Addr: *addr, Handler: srv}
 

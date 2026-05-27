@@ -9,6 +9,8 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"sort"
+	"strings"
 	"syscall"
 	"time"
 
@@ -24,7 +26,7 @@ import (
 func main() {
 	if len(os.Args) < 2 {
 		fmt.Fprintln(os.Stderr, "Usage: hearsay <command> [args]")
-		fmt.Fprintln(os.Stderr, "Commands: init, claim, release, heartbeat, query, check, namespace, serve, cursor, watch")
+		fmt.Fprintln(os.Stderr, "Commands: init, claim, release, heartbeat, query, check, namespace, serve, cursor, watch, status")
 		os.Exit(1)
 	}
 
@@ -50,6 +52,8 @@ func main() {
 		cmdWatch(os.Args[2:])
 	case "cursor":
 		cmdCursor(os.Args[2:])
+	case "status":
+		cmdStatus(os.Args[2:])
 	default:
 		fmt.Fprintf(os.Stderr, "Unknown command: %s\n", cmd)
 		os.Exit(1)
@@ -516,5 +520,111 @@ func cmdWatch(args []string) {
 	if err := w.Run(context.Background()); err != nil {
 		fmt.Fprintf(os.Stderr, "Watcher error: %v\n", err)
 		os.Exit(1)
+	}
+}
+
+func cmdStatus(args []string) {
+	fs := flag.NewFlagSet("status", flag.ExitOnError)
+	verbose := fs.Bool("verbose", false, "Show detailed claim and mailbox activity")
+	fs.Parse(args)
+
+	provider, err := loadProvider()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		os.Exit(1)
+	}
+
+	cfg, err := hearsay.LoadConfig(".hearsay.toml")
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error loading config: %v\n", err)
+		os.Exit(1)
+	}
+
+	ctx := context.Background()
+
+	claims, err := provider.ActiveClaims(ctx, cfg.Namespace, "")
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error querying claims: %v\n", err)
+		os.Exit(1)
+	}
+
+	agents := make(map[string]bool)
+	for _, c := range claims {
+		agents[c.AgentID] = true
+	}
+
+	var allMailboxMsgs []hearsay.MailboxMessage
+	totalMailbox := 0
+	unreadMailbox := 0
+	for agentID := range agents {
+		msgs, err := provider.GetMailbox(ctx, cfg.Namespace, agentID, hearsay.MailboxQueryOpts{Limit: 50})
+		if err != nil {
+			continue
+		}
+		totalMailbox += len(msgs)
+		for _, m := range msgs {
+			if !m.Read {
+				unreadMailbox++
+			}
+		}
+		allMailboxMsgs = append(allMailboxMsgs, msgs...)
+	}
+
+	providerInfo := cfg.Provider
+	if cfg.Provider == "sqlite" {
+		path := ".hearsay.db"
+		if cfg.ProviderCfg.SQLite != nil && cfg.ProviderCfg.SQLite.Path != "" {
+			path = cfg.ProviderCfg.SQLite.Path
+		}
+		providerInfo = fmt.Sprintf("sqlite (%s)", path)
+	}
+
+	fmt.Printf("Namespace:       %s\n", cfg.Namespace)
+	fmt.Printf("Provider:        %s\n", providerInfo)
+	fmt.Printf("Active claims:   %d\n", len(claims))
+	fmt.Printf("Mailbox:         %d messages (%d unread)\n", totalMailbox, unreadMailbox)
+
+	agentList := make([]string, 0, len(agents))
+	for a := range agents {
+		agentList = append(agentList, a)
+	}
+	sort.Strings(agentList)
+	fmt.Printf("Agents online:   %d", len(agents))
+	if len(agentList) > 0 {
+		fmt.Printf(" (%s)", strings.Join(agentList, ", "))
+	}
+	fmt.Println()
+
+	if *verbose {
+		fmt.Println()
+		if len(claims) > 0 {
+			fmt.Println("Active claims:")
+			for _, c := range claims {
+				age := time.Since(c.CreatedAt).Truncate(time.Second)
+				fmt.Printf("  %-10s %-30s %-8s %-15s %s ago\n",
+					c.AgentID, c.ResourceURI, c.Operation, c.Intent, age)
+			}
+			fmt.Println()
+		}
+
+		if len(allMailboxMsgs) > 0 {
+			fmt.Println("Recent mailbox (last 10):")
+			sort.Slice(allMailboxMsgs, func(i, j int) bool {
+				return allMailboxMsgs[i].CreatedAt.After(allMailboxMsgs[j].CreatedAt)
+			})
+			limit := 10
+			if len(allMailboxMsgs) < limit {
+				limit = len(allMailboxMsgs)
+			}
+			for _, m := range allMailboxMsgs[:limit] {
+				status := " "
+				if m.Read {
+					status = "✓"
+				}
+				age := time.Since(m.CreatedAt).Truncate(time.Second)
+				fmt.Printf("  %s %-10s → %-10s %-20s %s ago\n",
+					status, m.From, m.To, string(m.Type), age)
+			}
+		}
 	}
 }

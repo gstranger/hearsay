@@ -5,8 +5,11 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"log"
 	"net/http"
 	"os"
+	"os/signal"
+	"syscall"
 	"time"
 
 	"github.com/gstranger/hearsay/internal/a2a"
@@ -312,6 +315,8 @@ func cmdServe(args []string) {
 	a2aAPIKey := fs.String("a2a-api-key", "", "A2A API key for api-key auth scheme")
 	a2aBearerValidatorURL := fs.String("a2a-bearer-validator-url", "", "External URL for Bearer token validation")
 	a2aBearerJWKSURL := fs.String("a2a-bearer-jwks-url", "", "JWKS URL for built-in JWT Bearer validation")
+	authToken := fs.String("auth-token", "", "Auth token for REST API. When set, mutating endpoints require Authorization: Bearer <token> or X-Api-Key: <token>")
+	logFormat := fs.String("log-format", "text", "Log format: text or json")
 	fs.Parse(args)
 
 	cfg, err := hearsay.LoadConfig(".hearsay.toml")
@@ -332,6 +337,13 @@ func cmdServe(args []string) {
 		os.Exit(1)
 	}
 
+	var logFmt server.LogFormat
+	if *logFormat == "json" {
+		logFmt = server.LogFormatJSON
+	} else {
+		logFmt = server.LogFormatText
+	}
+
 	// Build A2A config from flags OR toml
 	var a2aCfg *hearsay.A2AConfig
 	if *a2aAddr != "" {
@@ -346,6 +358,7 @@ func cmdServe(args []string) {
 	}
 
 	// Start A2A server if configured
+	var a2aHttpSrv *http.Server
 	if a2aCfg != nil {
 		authMW := &a2a.AuthMiddleware{
 			APIKey:             a2aCfg.APIKey,
@@ -353,20 +366,65 @@ func cmdServe(args []string) {
 			BearerJWKSURL:      a2aCfg.BearerJWKSURL,
 		}
 		a2aSrv := a2a.NewServer(a2aCfg, client, provider, authMW, cfg.Namespace)
+		a2aHttpSrv = &http.Server{Addr: a2aCfg.Addr, Handler: authMW.Middleware(a2aSrv)}
 		go func() {
-			fmt.Printf("A2A server listening on %s\n", a2aCfg.Addr)
-			if err := http.ListenAndServe(a2aCfg.Addr, authMW.Middleware(a2aSrv)); err != nil {
-				fmt.Fprintf(os.Stderr, "A2A server error: %v\n", err)
+			log.Printf("A2A server listening on %s", a2aCfg.Addr)
+			if err := a2aHttpSrv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+				log.Printf("A2A server error: %v", err)
 			}
 		}()
 	}
 
-	srv := server.New(client, provider, cfg.Defaults.Locking)
-	fmt.Printf("Listening on %s\n", *addr)
-	if err := http.ListenAndServe(*addr, srv); err != nil {
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-		os.Exit(1)
+	srv := server.New(client, provider, cfg.Defaults.Locking, *authToken, logFmt)
+
+	httpSrv := &http.Server{Addr: *addr, Handler: srv}
+
+	// Background sweeper: clean up expired claims every 60 seconds
+	go func() {
+		ticker := time.NewTicker(60 * time.Second)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ticker.C:
+				before := time.Now().UTC()
+				if err := provider.ReleaseExpired(context.Background(), cfg.Namespace, before); err != nil {
+					log.Printf("sweeper error: %v", err)
+				}
+			}
+		}
+	}()
+
+	// Graceful shutdown on SIGINT/SIGTERM
+	idleConnsClosed := make(chan struct{})
+	go func() {
+		sigCh := make(chan os.Signal, 1)
+		signal.Notify(sigCh, os.Interrupt, syscall.SIGTERM)
+		<-sigCh
+		log.Println("shutting down...")
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		if err := httpSrv.Shutdown(shutdownCtx); err != nil {
+			log.Printf("shutdown error: %v", err)
+		}
+		close(idleConnsClosed)
+	}()
+
+	// Shutdown A2A server when REST server shuts down
+	if a2aHttpSrv != nil {
+		go func() {
+			<-idleConnsClosed
+			shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+			a2aHttpSrv.Shutdown(shutdownCtx)
+		}()
 	}
+
+	log.Printf("Listening on %s", *addr)
+	if err := httpSrv.ListenAndServe(); err != http.ErrServerClosed {
+		log.Fatalf("server error: %v", err)
+	}
+	<-idleConnsClosed
+	log.Println("server stopped")
 }
 
 func loadProviderFromConfig(cfg *hearsay.Config) (hearsay.Provider, error) {

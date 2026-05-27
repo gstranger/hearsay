@@ -416,19 +416,7 @@ func cmdServe(args []string) {
 	httpSrv := &http.Server{Addr: *addr, Handler: srv}
 
 	// Background sweeper: clean up expired claims every 60 seconds
-	go func() {
-		ticker := time.NewTicker(60 * time.Second)
-		defer ticker.Stop()
-		for {
-			select {
-			case <-ticker.C:
-				before := time.Now().UTC()
-				if err := provider.ReleaseExpired(context.Background(), cfg.Namespace, before); err != nil {
-					log.Printf("sweeper error: %v", err)
-				}
-			}
-		}
-	}()
+	server.RunSweeper(context.Background(), provider, cfg.Namespace, 60*time.Second)
 
 	// Background death detector: auto-release claims from dead agents
 	go func() {

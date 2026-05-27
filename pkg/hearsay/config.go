@@ -80,3 +80,23 @@ func (c *Config) Save(path string) error {
 	defer f.Close()
 	return toml.NewEncoder(f).Encode(c)
 }
+
+// NewConfig creates a Config directly without reading from disk.
+// Useful for WASM builds and programmatic configuration.
+func NewConfig(namespace string, provider string, sqlitePath string, postgresURL string) *Config {
+	cfg := &Config{
+		Version:   1,
+		Namespace: namespace,
+		Provider:  provider,
+		Defaults:  DefaultsConfig{TTLSeconds: 300, AutoHeartbeat: true},
+	}
+	switch provider {
+	case "sqlite":
+		cfg.ProviderCfg.SQLite = &SQLiteConfig{Path: sqlitePath}
+	case "postgresql":
+		cfg.ProviderCfg.PostgreSQL = &PostgreSQLConfig{URL: postgresURL}
+	case "d1":
+		cfg.ProviderCfg.D1 = &D1Config{}
+	}
+	return cfg
+}

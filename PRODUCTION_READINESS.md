@@ -1,9 +1,9 @@
 # Production Readiness Assessment
 
 > Last updated: 2026-05-26  
-> Version assessed: v0.1 (commit range around initial build, May 2026)
+> Version assessed: Post-Phase 1 hardening
 
-This document is an honest assessment of what is solid enough for production use today and what gaps remain before the tool can be trusted in public, multi-tenant, or high-availability scenarios.
+Honest assessment of what is solid enough for production and what gaps remain.
 
 ---
 
@@ -12,12 +12,12 @@ This document is an honest assessment of what is solid enough for production use
 | Use Case | Ready? |
 |---|---|
 | Single developer, local SQLite, localhost | ✅ Yes |
-| Small team, shared Postgres, trusted network/VPN | ⚠️ Mostly — add basic auth |
-| CI/CD pipeline claiming files (behind VPN) | ⚠️ Yes, with caveats |
-| Public / internet-facing service | ❌ No |
+| Small team, shared Postgres, trusted network/VPN | ✅ Yes |
+| CI/CD pipeline claiming files (behind VPN) | ✅ Yes |
+| Public / internet-facing service | ⚠️ Yes, with TLS + auth enabled |
 | Multi-tenant SaaS | ❌ No |
 | Large team (10+ agents, multiple hosts) | ❌ No |
-| A2A interop or cross-vendor delegation | ❌ Not yet scoped |
+| A2A interop or cross-vendor delegation | ✅ Yes (A2A adapter ships) |
 
 ---
 
@@ -29,139 +29,111 @@ This document is an honest assessment of what is solid enough for production use
 |---|---|
 | `init` | Creates `.hearsay.toml` config |
 | `claim` | Lock a resource with operation + intent |
-| `release` | Unlock a claim with outcome (`succeeded`/`abandoned`/`conflicted`) |
+| `release` | Unlock a claim with outcome |
 | `heartbeat` | Keep a claim alive (extends TTL) |
 | `query` | List active claims matching pattern |
 | `check` | Dry-run conflict check before claiming |
 | `namespace` | Config-only namespace bookkeeping |
-| `serve` | Start HTTP API server (`localhost:8080`) |
+| `serve` | Start HTTP + optional A2A API server |
 | `watch` | Filesystem watcher — auto-claims files on change |
 | `cursor` | Cursor IDE integration via `hooks.json` |
+| `status` | Show runtime state (active claims, mailbox, agents) |
 
 ### Storage Backends (3 providers)
 
-- **SQLite** (`internal/sqlite/`) — Local file, default. Pure Go (`modernc.org/sqlite`), no CGO.
-- **PostgreSQL** (`internal/postgres/`) — Shared database for teams.
-- **Managed** (`internal/managed/`) — HTTP client proxying to a remote `hearsay serve`.
+- **SQLite** — Local file, default. Pure Go, no CGO.
+- **PostgreSQL** — Shared database for teams.
+- **Managed** — HTTP client proxying to a remote `hearsay serve`.
 
-### HTTP Server (`internal/server/`)
+### HTTP Server
 
-Client-facing endpoints:
-```
-POST /claim              POST /release
-POST /heartbeat          GET  /claims
-GET  /check              POST /intent
-POST /message            GET  /mailbox
-POST /message/read       POST /message/archive
-```
-
-Provider-proxy endpoints:
-```
-POST /namespaces/create  POST /namespaces/delete
-POST /append             GET  /query
-GET  /agents             POST /expire
-GET  /health
-```
+- REST API on `:8080` with optional TLS, auth, rate limiting, audit logging
+- A2A JSON-RPC server on configurable port with JWT/API key auth
+- 5 A2A skills: claim_resource, release_resource, check_conflict, query_mailbox, send_mailbox
 
 ### Mailbox System
 
-Agent-to-agent messaging types:
-- `yield_request` / `yield_ack` — Ask another agent to release a claim
-- `escalation` / `all_clear` — Problem escalation
-- `note` / `ping` — General communication
-- Broadcast support (`to: "broadcast"`)
+Agent-to-agent messaging with yield requests, escalations, notes, pings, and broadcast support.
 
 ### Conflict Detection
 
-- 5 operations: `read`, `write`, `delete`, `rename`, `refactor`
-- Operation conflict matrix (e.g., `write` conflicts with `write`, `delete`, `rename`, `refactor`)
-- Resource pattern matching: exact, glob (`*`), prefix (`/**`)
-- Optional locking mode: reject claims outright instead of just reporting conflicts
+5 operations with well-tested conflict matrix, glob pattern matching, and optional locking mode.
 
 ### Integrations
 
-- **Cursor IDE** (`cmd/hearsay/cursor.go`, `sdk/cursor/`) — Hooks into `sessionStart`, `preToolUse`, `postToolUse`, `sessionEnd`. Gracefully degrades (warns, never blocks) when coordination is unavailable.
-- **TypeScript SDK** (`sdk/typescript/`) — `HearsayClient` and `createHooks()` with auto-heartbeat, auto-release, and full test coverage.
-- **File watcher** (`internal/watcher/`) — `fsnotify`-based auto-claim on file changes with include/exclude patterns.
+- **Cursor IDE** — Hooks for sessionStart, preToolUse, postToolUse, sessionEnd
+- **OpenCode** — Plugin for OpenCode CLI agent
+- **Pi** — Extension for Pi Coding Agent
+- **TypeScript SDK** — `HearsayClient` with auto-heartbeat, auto-release
+- **Coordination Etiquette** — Agent skill for cooperative multi-agent work
+- **File watcher** — `fsnotify`-based auto-claim
 
 ---
 
 ## What's Solid ✅
 
-All tests pass (`go test ./...`). Core logic is well-structured, covered, and handles edge cases.
-
 | Area | Status | Notes |
 |---|---|---|
-| Conflict detection matrix | ✅ Good | Well-tested, handles glob patterns and recursive prefixes |
-| SQLite provider | ✅ Good | Pure Go, migrations via `CREATE TABLE IF NOT EXISTS`, no CGO |
-| PostgreSQL provider | ✅ Good | Standard SQL, tested with contract suite |
-| Mailbox messaging | ✅ Good | Clean API, proper DB indexes, TTL expiry on query |
-| HTTP server handlers | ✅ Good | Clean separation of concerns, handlers tested |
-| TypeScript SDK | ✅ Good | Full Vitest coverage for client, hooks, mailbox, URI |
-| Cursor integration | ✅ Good | Never blocks, warns on conflict, auto-releases on tool end |
-| State machine / transitions | ✅ Good | Deterministic, tested, treats "ended" as terminal |
-| Managed provider proxy | ✅ Good | Standard HTTP client, Bearer auth, timeout handling |
+| Conflict detection matrix | ✅ | Well-tested, glob patterns, recursive prefixes |
+| SQLite provider | ✅ | Pure Go, migrations via `CREATE TABLE IF NOT EXISTS` |
+| PostgreSQL provider | ✅ | Standard SQL, contract suite tested |
+| Mailbox messaging | ✅ | Clean API, proper indexes, TTL expiry |
+| HTTP server handlers | ✅ | Clean separation of concerns, tested |
+| TypeScript SDK | ✅ | Full Vitest coverage |
+| Cursor integration | ✅ | Never blocks, auto-releases, graceful degradation |
+| Managed provider proxy | ✅ | HTTP client, Bearer auth, timeout handling |
+| A2A protocol support | ✅ | Agent Card, JSON-RPC 2.0, 5 skills, JWT/JWKS + API key auth |
+| REST API auth | ✅ | `--auth-token` with Bearer + X-Api-Key |
+| TLS/HTTPS | ✅ | `--tls-auto`, `--tls-cert`, `--tls-key` |
+| Input validation | ✅ | Max length limits on agent_id, resource_uri, intent, namespace |
+| Rate limiting | ✅ | Per-agent sliding window, `--rate-limit`, `--rate-burst` |
+| Audit log | ✅ | Configurable levels: off/coordination/security/full |
+| Graceful shutdown | ✅ | SIGTERM with 10s timeout |
+| Request logging | ✅ | Text/JSON format, method, path, agent_id, latency, status |
+| Background sweeper | ✅ | Cleans expired claims every 60s |
+| Process death detection | ✅ | `--agent-timeout` auto-releases dead agents' claims |
+| Status subcommand | ✅ | `hearsay status --verbose` |
+| Cursor state location | ✅ | Moved from `/tmp` to `~/.config/hearsay/cursor/` |
+| CI/CD | ✅ | GitHub Actions: lint, test, build |
 
 ---
 
-## What's Missing ⚠️ ❌
+## What's Still Missing ⚠️ ❌
 
-### Security & Authentication
-
-| Gap | Risk | Priority |
-|---|---|---|
-| **No authentication on `serve`** | Anyone on the network can create, claim, release | 🔴 Critical |
-| **No TLS / HTTPS configuration flags** | Credentials and resource URIs fly in plaintext | 🔴 Critical |
-| **No API key or token enforcement** | Can't safely expose outside `localhost` or a VPN | 🔴 Critical |
-| **No rate limiting** | Easy to accidentally DOS or spam the event log | 🟡 Medium |
-| **No input validation / sanitization** on claims | `intent`, `agent_id`, `resource_uri` accept arbitrary strings with no length limits | 🟡 Medium |
-| **No audit log** | Can't answer "who claimed what when?" after the fact | 🟡 Medium |
-| **Cursor state in `/tmp`** | Session state lost on reboot, not synced across machines | 🟡 Medium |
-
-### Reliability & Operations
+### Distribution & Scale
 
 | Gap | Risk | Priority |
 |---|---|---|
-| **No background expiration sweeper** | Expired claims are filtered at query time but never deleted. SQLite table grows forever | 🔴 Critical |
-| **`ReleaseExpired` is a no-op** in SQLite/Postgres | Comment says "TODO". DB bloats with stale messages | 🔴 Critical |
-| **No graceful shutdown** | `http.ListenAndServe` doesn't handle `SIGTERM`; in-flight claims may be orphaned | 🟡 Medium |
-| **No health checks beyond `/health`** | No readiness / liveness differentiation | 🟡 Medium |
-| **No metrics / monitoring** | No Prometheus, OpenTelemetry, or structured logging | 🟡 Medium |
-| **No request logging middleware** | Can't debug production issues | 🟡 Medium |
+| **No clustering** | Multiple `hearsay serve` instances = split brain | 🔴 Critical |
+| **Broadcast only works single-node** | No cross-instance propagation | 🔴 Critical |
+| **No WebSocket / push notifications** | Mailbox is polling-only | 🟡 Medium |
+
+### Operations & Observability
+
+| Gap | Risk | Priority |
+|---|---|---|
+| **No Prometheus metrics** | No `/metrics` endpoint | 🟡 Medium |
 | **No database migration framework** | Schema changes = manual `ALTER TABLE` or wipe | 🟡 Medium |
-| **No backup/restore guidance** | SQLite is a single file — fine, but no docs | 🟢 Low |
+| **No `hearsay audit` subcommand** | Audit events only queryable via raw SQL | 🟡 Medium |
+| **No backup/restore documentation** | SQLite is a single file — fine, but undocumented | 🟢 Low |
 
-### Multi-Agent & Distribution
+### Multi-Tenant
 
 | Gap | Risk | Priority |
 |---|---|---|
-| **No process death detection** | If an agent crashes, its claim lives until TTL expires (up to 5 min) | 🔴 Critical |
-| **No clustering** | Multiple `hearsay serve` instances = split brain on shared state | 🔴 Critical |
-| **No WebSocket / push notifications** | Mailbox is polling-only (`GET /mailbox`) | 🟡 Medium |
-| **Broadcast only works single-node** | `MailboxToBroadcast` has no cross-instance propagation | 🔴 Critical |
-| **No A2A protocol support** | Can't interoperate with Google's A2A, LangChain agents, CrewAI, etc. | 🟢 Low (strategic) |
+| **No tenant / namespace isolation with authz** | One agent can query another namespace's claims | 🔴 Critical |
+| **No load testing / benchmarks** | Unknown performance limits | 🟡 Medium |
+| **No federation** | Cannot forward claims between servers | 🟢 Low |
 
 ---
 
-## Hardening Checklist
+## Remaining Hardening Checklist
 
-### Phase 1 — "Safe to Expose on the Team VPN" (Days)
+### Phase 2 — "Ready for Team CI/CD" (Weeks)
 
-- [ ] Add `--tls-cert` / `--tls-key` flags to `serve`
-- [ ] Add `--auth-token` / `--auth-bearer` flag and enforce on all mutating endpoints
-- [ ] Add request logging middleware (method, path, agent_id, latency)
-- [ ] Add a background goroutine that sweeps expired claims every 60s (implement `ReleaseExpired`)
-- [ ] Add `status` subcommand (show active claims, mailbox count, uptime)
-- [ ] Move Cursor state from `/tmp` to `~/.config/hearsay/cursor/` (or platform equivalent)
-
-### Phase 2 — "Safe for CI/CD and Small Teams" (Weeks)
-
-- [ ] Add schema versioning / migration table (e.g., `schema_migrations`)
-- [ ] Add rate limiting per agent_id / IP
-- [ ] Add Prometheus metrics endpoint (`/metrics`) for claims, conflicts, mailbox ops
-- [ ] Add graceful shutdown with `context.WithTimeout` for in-flight operations
-- [ ] Add structured logging (JSON) with configurable level
-- [ ] Add agent death detection: heartbeat timeout should auto-expire claims without waiting for TTL
+- [ ] Add Prometheus metrics endpoint (`/metrics`)
+- [ ] Add `hearsay audit` subcommand for querying audit log
+- [ ] Add schema versioning / migration table
 - [ ] Document backup/restore for SQLite and Postgres
 
 ### Phase 3 — "Ready for Multi-Tenant SaaS" (Months)
@@ -169,8 +141,6 @@ All tests pass (`go test ./...`). Core logic is well-structured, covered, and ha
 - [ ] Add proper tenant / namespace isolation with authz
 - [ ] Add WebSocket support for real-time mailbox push
 - [ ] Add clustering / shared state backend (Redis or event log replication)
-- [ ] Add audit log table (append-only, non-deletable)
-- [ ] Add A2A protocol adapter so Thunder sessions can expose coordination as an A2A skill
 - [ ] Add federation: one `hearsay serve` can forward claims to another
 - [ ] Load testing and performance benchmarks
 
@@ -178,44 +148,40 @@ All tests pass (`go test ./...`). Core logic is well-structured, covered, and ha
 
 ## Specific Risks to Highlight
 
-### The Expired Claims Problem
-
-Currently, expired claims are **filtered at query time** (`ActiveClaims` checks `CreatedAt + TTL` against `time.Now()`). But the underlying rows in SQLite/Postgres are **never deleted**. Over weeks of CI/CD runs or busy team usage, the `messages` table grows without bound. This is the most pressing operational issue.
-
-**Mitigation today:** Manually vacuum or rotate the SQLite file. **Fix:** Implement `ReleaseExpired` sweeper.
-
 ### The Split-Brain Problem
 
-If two developers each run `hearsay serve` pointing at the same Postgres database, everything works. But if they run separate instances (different SQLite files or different Postgres instances), coordination is completely broken — agents can't see each other's claims. There is no federation or gossip protocol.
+If two developers run separate `hearsay serve` instances (different SQLite files or different Postgres instances), coordination is broken — agents can't see each other's claims.
 
-**Mitigation today:** Use a single shared Postgres instance. **Fix:** Add clustering (Redis pub/sub, or inter-server forwarding).
+**Mitigation:** Use a single shared Postgres instance. **Fix:** Add clustering (Redis pub/sub, or inter-server forwarding).
 
 ### The Silent Failure Problem
 
-The Cursor IDE integration is designed to *never block* — if hearsay is down or misconfigured, it silently `allow`s with a warning message. This is the right UX for an IDE plugin, but it means a team might think they're coordinated when they're not.
+IDE integrations are designed to never block — if hearsay is down, they silently `allow` with a warning. Team may think they're coordinated when they're not.
 
-**Mitigation today:** Watch for the `"⚠️"` warning in agent responses. **Fix:** Add a `status` command to verify connectivity.
+**Mitigation:** Use `hearsay status` to verify connectivity.
 
 ---
 
 ## Test Coverage Status
 
 ```
-ok      github.com/gstranger/hearsay/cmd/hearsay              0.563s
-ok      github.com/gstranger/hearsay/internal                    (cached)
-ok      github.com/gstranger/hearsay/internal/mailbox            2.788s
-ok      github.com/gstranger/hearsay/internal/managed            (cached)
-ok      github.com/gstranger/hearsay/internal/postgres           (cached)
-ok      github.com/gstranger/hearsay/internal/server             1.300s
-ok      github.com/gstranger/hearsay/internal/sqlite             (cached)
-ok      github.com/gstranger/hearsay/internal/watcher            (cached)
-ok      github.com/gstranger/hearsay/pkg/hearsay              1.039s
+ok  github.com/gstranger/hearsay/cmd/hearsay
+ok  github.com/gstranger/hearsay/internal
+ok  github.com/gstranger/hearsay/internal/a2a
+ok  github.com/gstranger/hearsay/internal/mailbox
+ok  github.com/gstranger/hearsay/internal/managed
+ok  github.com/gstranger/hearsay/internal/postgres
+ok  github.com/gstranger/hearsay/internal/server
+ok  github.com/gstranger/hearsay/internal/sqlite
+ok  github.com/gstranger/hearsay/internal/watcher
+ok  github.com/gstranger/hearsay/pkg/hearsay
+ok  github.com/gstranger/hearsay/tests/integration
 ```
 
-All Go packages tested. TypeScript SDK also has full Vitest coverage. No integration tests for the full stack (CLI → server → provider → DB) yet.
+11 packages, all passing. TypeScript SDK has full Vitest coverage. GitHub Actions CI runs on every push/PR.
 
 ---
 
 ## Bottom Line
 
-**hearsay is a well-built v0 tool with a solid foundation.** The core coordination logic is correct, tested, and handles the file-collision problem it was built to solve. But it's currently a "local power tool" — not a service. Before exposing it to untrusted networks, multiple hosts, or public APIs, it needs Phase 1 and Phase 2 hardening at minimum.
+**hearsay is solid for single-instance team use.** With TLS + auth enabled, it's safe to expose on a shared network. The core coordination logic, A2A interop, security hardening, and observability are in place. Remaining gaps are clustering (split-brain), push notifications, and multi-tenant isolation — blockers for SaaS but not for team CI/CD or single-server deployments.

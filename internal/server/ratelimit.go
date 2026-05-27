@@ -5,6 +5,8 @@ import (
 	"strconv"
 	"sync"
 	"time"
+
+	"github.com/gstranger/hearsay/pkg/hearsay"
 )
 
 // RateLimiter implements per-agent sliding window rate limiting.
@@ -12,6 +14,7 @@ type RateLimiter struct {
 	mu       sync.Mutex
 	perAgent map[string][]time.Time
 	limit    int // max requests per second (0 = disabled)
+	Audit    *AuditLogger
 }
 
 func NewRateLimiter(limit, burst int) *RateLimiter {
@@ -67,6 +70,9 @@ func (rl *RateLimiter) Wrap(next http.HandlerFunc) http.HandlerFunc {
 
 		if limited {
 			w.Header().Set("Retry-After", "1")
+			if rl.Audit != nil {
+				rl.Audit.Log(hearsay.AuditEventRateLimit, agentID, "", "blocked", nil)
+			}
 			http.Error(w, `{"error":"rate limit exceeded"}`, http.StatusTooManyRequests)
 			return
 		}

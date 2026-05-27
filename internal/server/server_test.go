@@ -21,7 +21,7 @@ func setupTestServer(t *testing.T) (*Server, func()) {
 		t.Fatal(err)
 	}
 	client := hearsay.NewClient(p, "test")
-	return New(client, p, false, "", LogFormatText, 0, 0), func() {}
+	return New(client, p, false, "", LogFormatText, 0, 0, hearsay.AuditOff, "test"), func() {}
 }
 
 func post(t *testing.T, srv *Server, path, body string) *http.Response {
@@ -43,7 +43,7 @@ func TestServer_AuthRejectsUnauthenticated(t *testing.T) {
 	p := memory.New()
 	p.CreateNamespace(ctx, hearsay.Namespace{ID: "test"})
 	client := hearsay.NewClient(p, "test")
-	srv := New(client, p, false, "secret", LogFormatText, 0, 0)
+	srv := New(client, p, false, "secret", LogFormatText, 0, 0, hearsay.AuditOff, "test")
 
 	req := httptest.NewRequest("POST", "/claim", strings.NewReader(`{}`))
 	rr := httptest.NewRecorder()

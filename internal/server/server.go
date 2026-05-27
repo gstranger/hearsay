@@ -18,9 +18,10 @@ type Server struct {
 	auth      *AuthMiddleware
 	logger    *LoggingMiddleware
 	rateLimit *RateLimiter
+	audit     *AuditLogger
 }
 
-func New(client *hearsay.Client, provider hearsay.Provider, locking bool, authToken string, logFormat LogFormat, rateLimit, rateBurst int) *Server {
+func New(client *hearsay.Client, provider hearsay.Provider, locking bool, authToken string, logFormat LogFormat, rateLimit, rateBurst int, auditLevel hearsay.AuditLevel, namespace string) *Server {
 	s := &Server{
 		client:    client,
 		provider:  provider,
@@ -29,7 +30,10 @@ func New(client *hearsay.Client, provider hearsay.Provider, locking bool, authTo
 		auth:      &AuthMiddleware{Token: authToken},
 		logger:    &LoggingMiddleware{Format: logFormat},
 		rateLimit: NewRateLimiter(rateLimit, rateBurst),
+		audit:     NewAuditLogger(provider, auditLevel, namespace),
 	}
+	s.auth.Audit = s.audit
+	s.rateLimit.Audit = s.audit
 	// Read-only endpoints (no auth required)
 	s.mux.HandleFunc("GET /health", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
@@ -108,6 +112,7 @@ func (s *Server) handleClaim(w http.ResponseWriter, r *http.Request) {
 
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(resp)
+	s.audit.Log(hearsay.AuditEventClaim, req.AgentID, req.ResourceURI, "granted", nil)
 }
 
 func (s *Server) handleRelease(w http.ResponseWriter, r *http.Request) {
@@ -124,6 +129,7 @@ func (s *Server) handleRelease(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
+	s.audit.Log(hearsay.AuditEventRelease, "", "", string(req.Outcome), map[string]string{"claim_id": req.ClaimID})
 }
 
 func (s *Server) handleHeartbeat(w http.ResponseWriter, r *http.Request) {

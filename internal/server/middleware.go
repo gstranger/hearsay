@@ -5,11 +5,14 @@ import (
 	"net/http"
 	"strings"
 	"time"
+
+	"github.com/gstranger/hearsay/pkg/hearsay"
 )
 
 // AuthMiddleware wraps handlers that require authentication.
 type AuthMiddleware struct {
 	Token string
+	Audit *AuditLogger
 }
 
 func (a *AuthMiddleware) Wrap(next http.HandlerFunc) http.HandlerFunc {
@@ -31,6 +34,9 @@ func (a *AuthMiddleware) Wrap(next http.HandlerFunc) http.HandlerFunc {
 				next(w, r)
 				return
 			}
+		}
+		if a.Audit != nil {
+			a.Audit.Log(hearsay.AuditEventAuthFailure, "", "", "unauthorized", nil)
 		}
 		http.Error(w, `{"error":"unauthorized"}`, http.StatusUnauthorized)
 	}

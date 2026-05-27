@@ -317,6 +317,9 @@ func cmdServe(args []string) {
 	a2aBearerJWKSURL := fs.String("a2a-bearer-jwks-url", "", "JWKS URL for built-in JWT Bearer validation")
 	authToken := fs.String("auth-token", "", "Auth token for REST API. When set, mutating endpoints require Authorization: Bearer <token> or X-Api-Key: <token>")
 	logFormat := fs.String("log-format", "text", "Log format: text or json")
+	tlsCert := fs.String("tls-cert", "", "Path to TLS certificate file")
+	tlsKey := fs.String("tls-key", "", "Path to TLS private key file")
+	tlsAuto := fs.Bool("tls-auto", false, "Auto-generate self-signed TLS certificate")
 	fs.Parse(args)
 
 	cfg, err := hearsay.LoadConfig(".hearsay.toml")
@@ -357,6 +360,20 @@ func cmdServe(args []string) {
 		a2aCfg = cfg.A2A
 	}
 
+	// Auto-generate self-signed TLS certificate if --tls-auto set
+	if *tlsAuto {
+		if *tlsCert == "" && *tlsKey == "" {
+			cert, key, err := server.GenerateSelfSignedCert("", "")
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "Error generating TLS cert: %v\n", err)
+				os.Exit(1)
+			}
+			*tlsCert = cert
+			*tlsKey = key
+			log.Printf("Auto-generated TLS certificate: %s", cert)
+		}
+	}
+
 	// Start A2A server if configured
 	var a2aHttpSrv *http.Server
 	if a2aCfg != nil {
@@ -367,12 +384,21 @@ func cmdServe(args []string) {
 		}
 		a2aSrv := a2a.NewServer(a2aCfg, client, provider, authMW, cfg.Namespace)
 		a2aHttpSrv = &http.Server{Addr: a2aCfg.Addr, Handler: authMW.Middleware(a2aSrv)}
-		go func() {
-			log.Printf("A2A server listening on %s", a2aCfg.Addr)
-			if err := a2aHttpSrv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-				log.Printf("A2A server error: %v", err)
-			}
-		}()
+		if *tlsCert != "" && *tlsKey != "" {
+			go func() {
+				log.Printf("A2A server listening on %s (HTTPS)", a2aCfg.Addr)
+				if err := a2aHttpSrv.ListenAndServeTLS(*tlsCert, *tlsKey); err != nil && err != http.ErrServerClosed {
+					log.Printf("A2A server error: %v", err)
+				}
+			}()
+		} else {
+			go func() {
+				log.Printf("A2A server listening on %s (HTTP)", a2aCfg.Addr)
+				if err := a2aHttpSrv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+					log.Printf("A2A server error: %v", err)
+				}
+			}()
+		}
 	}
 
 	srv := server.New(client, provider, cfg.Defaults.Locking, *authToken, logFmt)
@@ -419,9 +445,16 @@ func cmdServe(args []string) {
 		}()
 	}
 
-	log.Printf("Listening on %s", *addr)
-	if err := httpSrv.ListenAndServe(); err != http.ErrServerClosed {
-		log.Fatalf("server error: %v", err)
+	if *tlsCert != "" && *tlsKey != "" {
+		log.Printf("Listening on %s (HTTPS)", *addr)
+		if err := httpSrv.ListenAndServeTLS(*tlsCert, *tlsKey); err != http.ErrServerClosed {
+			log.Fatalf("server error: %v", err)
+		}
+	} else {
+		log.Printf("Listening on %s (HTTP)", *addr)
+		if err := httpSrv.ListenAndServe(); err != http.ErrServerClosed {
+			log.Fatalf("server error: %v", err)
+		}
 	}
 	<-idleConnsClosed
 	log.Println("server stopped")

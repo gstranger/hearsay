@@ -326,6 +326,7 @@ func cmdServe(args []string) {
 	tlsAuto := fs.Bool("tls-auto", false, "Auto-generate self-signed TLS certificate")
 	rateLimit := fs.Int("rate-limit", 0, "Max requests per second per agent (0 = unlimited)")
 	rateBurst := fs.Int("rate-burst", 10, "Max burst size per agent")
+	agentTimeout := fs.Int("agent-timeout", 60, "Seconds without heartbeat before agent is declared dead (0 = disabled)")
 	fs.Parse(args)
 
 	cfg, err := hearsay.LoadConfig(".hearsay.toml")
@@ -421,6 +422,56 @@ func cmdServe(args []string) {
 				before := time.Now().UTC()
 				if err := provider.ReleaseExpired(context.Background(), cfg.Namespace, before); err != nil {
 					log.Printf("sweeper error: %v", err)
+				}
+			}
+		}
+	}()
+
+	// Background death detector: auto-release claims from dead agents
+	go func() {
+		if *agentTimeout <= 0 {
+			return
+		}
+		ticker := time.NewTicker(15 * time.Second)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ticker.C:
+				now := time.Now().UTC()
+				claims, err := provider.ActiveClaims(context.Background(), cfg.Namespace, "")
+				if err != nil {
+					log.Printf("death detector error: %v", err)
+					continue
+				}
+
+				agentClaims := make(map[string][]hearsay.Claim)
+				for _, c := range claims {
+					agentClaims[c.AgentID] = append(agentClaims[c.AgentID], c)
+				}
+
+				for agentID, claims := range agentClaims {
+					state, err := provider.AgentState(context.Background(), cfg.Namespace, agentID)
+					if err != nil || state.LastSeen.IsZero() {
+						continue
+					}
+					if now.Sub(state.LastSeen) > time.Duration(*agentTimeout)*time.Second {
+						log.Printf("agent %s appears dead (last seen %s ago), releasing %d claims",
+							agentID, now.Sub(state.LastSeen).Truncate(time.Second), len(claims))
+						for _, c := range claims {
+							payload, _ := json.Marshal(map[string]string{
+								"claim_id": c.ClaimID,
+								"outcome":  "abandoned_by_death",
+							})
+							msg := hearsay.Message{
+								Type:    hearsay.MsgRelease,
+								AgentID: agentID,
+								Payload: payload,
+							}
+							if err := provider.Append(context.Background(), cfg.Namespace, []hearsay.Message{msg}); err != nil {
+								log.Printf("death detector: failed to release claim %s: %v", c.ClaimID, err)
+							}
+						}
+					}
 				}
 			}
 		}

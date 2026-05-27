@@ -12,16 +12,30 @@ import (
 	"github.com/gstranger/hearsay/pkg/hearsay"
 )
 
-// CursorState is persisted to /tmp/hearsay-cursor-<session-id>.json
+// cursorStateDir returns the platform-specific directory for cursor state files.
+// Uses os.UserConfigDir() (e.g. ~/.config/hearsay/cursor/ on Linux,
+// ~/Library/Application Support/hearsay/cursor/ on macOS).
+// Falls back to os.TempDir() if UserConfigDir is unavailable.
+func cursorStateDir() string {
+	configDir, err := os.UserConfigDir()
+	if err != nil {
+		configDir = os.TempDir()
+	}
+	dir := filepath.Join(configDir, "hearsay", "cursor")
+	os.MkdirAll(dir, 0755)
+	return dir
+}
+
+func cursorStateFilePath(sessionID string) string {
+	return filepath.Join(cursorStateDir(), fmt.Sprintf("hearsay-cursor-%s.json", sessionID))
+}
+
+// CursorState is persisted to the user config directory as hearsay-cursor-<session-id>.json
 type CursorState struct {
 	SessionID    string            `json:"session_id"`
 	Namespace    string            `json:"namespace"`
 	AgentID      string            `json:"agent_id"`
 	ActiveClaims map[string]string `json:"active_claims"` // toolCallId -> claimId
-}
-
-func cursorStateFilePath(sessionID string) string {
-	return filepath.Join(os.TempDir(), fmt.Sprintf("hearsay-cursor-%s.json", sessionID))
 }
 
 func loadCursorState(sessionID string) (*CursorState, error) {

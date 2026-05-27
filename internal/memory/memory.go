@@ -335,7 +335,7 @@ func (p *Provider) SubscribeEvents(ctx context.Context, namespaceID string, sinc
 		// Replay: catch up on events since the given sequence
 		p.mu.RLock()
 		msgs := p.messages[namespaceID]
-		var currentSeq int64
+		currentSeq := since
 		for _, m := range msgs {
 			// memory provider uses offset as sequence
 			seq := m.Offset

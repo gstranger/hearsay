@@ -58,8 +58,10 @@ func StartTaskExecution(ctx context.Context, task *Task, msg Message, srv *Serve
 
 		// Transition to working
 		if err := task.Transition(TaskWorking); err != nil {
+			snapshot := *task
 			exec.send(TaskEvent{
 				Type:  "error",
+				Task:  &snapshot,
 				Error: NewError(-32003, "State transition failed: "+err.Error()),
 			})
 			return
@@ -108,8 +110,10 @@ func StartTaskExecution(ctx context.Context, task *Task, msg Message, srv *Serve
 
 		// Transition to completed
 		if err := task.Transition(TaskCompleted); err != nil {
+			snapshot := *task
 			exec.send(TaskEvent{
 				Type:  "error",
+				Task:  &snapshot,
 				Error: NewError(-32003, "State transition failed: "+err.Error()),
 			})
 			return

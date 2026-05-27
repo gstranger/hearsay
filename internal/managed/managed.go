@@ -114,6 +114,11 @@ func (p *Provider) Subscribe(ctx context.Context, namespaceID string, from hears
 	return ch, nil
 }
 
+// SubscribeEvents returns a channel that emits events. Not yet implemented for managed provider.
+func (p *Provider) SubscribeEvents(ctx context.Context, namespaceID string, since int64) (<-chan hearsay.Event, error) {
+	return nil, fmt.Errorf("SubscribeEvents not yet implemented for managed provider")
+}
+
 func (p *Provider) ActiveClaims(ctx context.Context, namespaceID string, resourcePattern string) ([]hearsay.Claim, error) {
 	url := fmt.Sprintf("%s/claims?namespace=%s&resource=%s", p.endpoint, namespaceID, resourcePattern)
 	resp, err := p.do(ctx, "GET", url, nil)

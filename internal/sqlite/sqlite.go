@@ -275,6 +275,11 @@ func (p *Provider) Subscribe(ctx context.Context, namespaceID string, from hears
 	return ch, nil
 }
 
+// SubscribeEvents returns a channel that emits events. Not yet implemented for SQLite.
+func (p *Provider) SubscribeEvents(ctx context.Context, namespaceID string, since int64) (<-chan hearsay.Event, error) {
+	return nil, fmt.Errorf("SubscribeEvents not yet implemented for SQLite")
+}
+
 func (p *Provider) ActiveClaims(ctx context.Context, namespaceID string, resourcePattern string) ([]hearsay.Claim, error) {
 	msgs, err := p.Query(ctx, namespaceID, hearsay.QueryOpts{
 		Types: []hearsay.MessageType{hearsay.MsgClaim, hearsay.MsgRelease, hearsay.MsgTransfer},

@@ -181,11 +181,11 @@ func (a *AuthMiddleware) Middleware(next http.Handler) http.Handler {
 	})
 }
 
-func (a *AuthMiddleware) authenticate(r *http.Request) AuthResult {
+func (a *AuthMiddleware) CheckAuth(r *http.Request) (string, error) {
 	// API key check
 	if a.APIKey != "" {
 		if r.Header.Get("X-Api-Key") == a.APIKey {
-			return AuthResult{OK: true, AgentID: ""}
+			return "", nil
 		}
 	}
 
@@ -194,14 +194,34 @@ func (a *AuthMiddleware) authenticate(r *http.Request) AuthResult {
 	if strings.HasPrefix(auth, "Bearer ") {
 		token := strings.TrimPrefix(auth, "Bearer ")
 		if a.BearerValidatorURL != "" {
-			return a.validateExternalBearer(token)
+			res := a.validateExternalBearer(token)
+			if res.OK {
+				return res.AgentID, nil
+			}
+			return "", fmt.Errorf("invalid bearer token")
 		}
 		if a.BearerJWKSURL != "" {
-			return a.validateJWTBearer(token)
+			res := a.validateJWTBearer(token)
+			if res.OK {
+				return res.AgentID, nil
+			}
+			return "", fmt.Errorf("invalid jwt token")
 		}
+		return "", fmt.Errorf("bearer auth not configured")
 	}
 
-	return AuthResult{OK: false}
+	if a.APIKey != "" {
+		return "", fmt.Errorf("invalid api key")
+	}
+	return "", fmt.Errorf("missing authorization")
+}
+
+func (a *AuthMiddleware) authenticate(r *http.Request) AuthResult {
+	agentID, err := a.CheckAuth(r)
+	if err != nil {
+		return AuthResult{OK: false}
+	}
+	return AuthResult{OK: true, AgentID: agentID}
 }
 
 func (a *AuthMiddleware) validateExternalBearer(token string) AuthResult {

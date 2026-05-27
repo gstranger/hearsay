@@ -327,6 +327,7 @@ func cmdServe(args []string) {
 	rateLimit := fs.Int("rate-limit", 0, "Max requests per second per agent (0 = unlimited)")
 	rateBurst := fs.Int("rate-burst", 10, "Max burst size per agent")
 	agentTimeout := fs.Int("agent-timeout", 60, "Seconds without heartbeat before agent is declared dead (0 = disabled)")
+	auditLevel := fs.String("audit-level", "off", "Audit log verbosity: off, coordination, security, full")
 	fs.Parse(args)
 
 	cfg, err := hearsay.LoadConfig(".hearsay.toml")
@@ -408,7 +409,9 @@ func cmdServe(args []string) {
 		}
 	}
 
-	srv := server.New(client, provider, cfg.Defaults.Locking, *authToken, logFmt, *rateLimit, *rateBurst)
+	auditLvl := hearsay.ParseAuditLevel(*auditLevel)
+
+	srv := server.New(client, provider, cfg.Defaults.Locking, *authToken, logFmt, *rateLimit, *rateBurst, auditLvl, cfg.Namespace)
 
 	httpSrv := &http.Server{Addr: *addr, Handler: srv}
 

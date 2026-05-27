@@ -1,0 +1,65 @@
+# OpenCode Extension
+
+Copy `agentstate.ts` to `.opencode/plugins/agentstate.ts` (project-local) or `~/.config/opencode/plugins/agentstate.ts` (global).
+
+## Requirements
+
+The extension needs `agentstate` binary in your `$PATH`. Install with:
+
+```bash
+go install github.com/thunder/agentstate/cmd/agentstate@latest
+```
+
+## Auto-start behavior
+
+The extension automatically starts `agentstate serve` in the background if:
+- No server is running on the configured endpoint (default `localhost:8080`)
+- The `agentstate` binary is found in `$PATH`
+
+If `.agentstate.toml` does not exist, the extension auto-runs `agentstate init --provider sqlite --namespace <namespace>` first.
+
+## Configuration
+
+Set environment variables (optional — defaults shown):
+
+```bash
+export AGENTSTATE_ENDPOINT=http://localhost:8080
+export AGENTSTATE_NAMESPACE=org/repo/branch
+export AGENTSTATE_AGENT_ID=opencode:gpt-4:sess_abc123
+export AGENTSTATE_TTL=300
+export AGENTSTATE_CLAIM_ON_READ=false
+export AGENTSTATE_ON_CONFLICT=block  # block | warn | allow
+```
+
+## Conflict Modes
+
+OpenCode's `tool.execute.before` hook API differs from pi's. Here's what each mode actually does:
+
+| Mode | Behavior | Agent sees conflict? |
+|------|----------|---------------------|
+| **`block`** (default) | Throws error, tool fails | ✅ Yes — as error message |
+| **`allow`** | Silently proceeds | ❌ No |
+| **`warn`** | Proceeds, **attempts** to prepend warning to tool result | ⚠️ Experimental (see below) |
+
+### Why `warn` is experimental
+
+OpenCode's `tool.execute.after` hook receives `(input, output)` but the docs don't confirm whether `output` is mutable or where tool results actually flow. The extension attempts to prepend a warning to `output.result`:
+
+```javascript
+"tool.execute.after": async (input, output) => {
+  output.result = `⚠️ Conflict: ...\n\n---\n${output.result}`;
+}
+```
+
+**This may or may not reach the agent.** If you test this and confirm it works (or doesn't), please open an issue.
+
+### Why `block` is the default
+
+Since `warn` is unconfirmed, `block` is the safest default. The agent sees the conflict as an error and can choose a different action. This is actually more protective than a warning the agent might ignore.
+
+## Behavior
+
+- Claims resources before `read`, `write`, `edit`, `bash` tool calls
+- Blocks on conflict (in `block` mode)
+- Releases claims on tool result
+- Releases all as "abandoned" on session shutdown/idle (`session.status` event)

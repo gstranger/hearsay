@@ -1,0 +1,31 @@
+{
+  "version": 1,
+  "hooks": {
+    "sessionStart": [
+      {
+        "command": "agentstate cursor session-start --session-id {{sessionId}} --namespace {{projectNamespace}} --agent-id cursor:{{model}}:{{sessionId}}",
+        "timeout": 5
+      }
+    ],
+    "preToolUse": [
+      {
+        "command": "agentstate cursor pre-tool-use --session-id {{sessionId}} --tool {{toolName}} --input '{{toolInputJson}}' --on-conflict warn",
+        "timeout": 5,
+        "matcher": "Read|Write|Edit|Bash"
+      }
+    ],
+    "postToolUse": [
+      {
+        "command": "agentstate cursor post-tool-use --session-id {{sessionId}} --tool {{toolName}} --input '{{toolInputJson}}'",
+        "timeout": 5,
+        "matcher": "Read|Write|Edit|Bash"
+      }
+    ],
+    "sessionEnd": [
+      {
+        "command": "agentstate cursor session-end --session-id {{sessionId}}",
+        "timeout": 5
+      }
+    ]
+  }
+}

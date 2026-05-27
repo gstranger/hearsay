@@ -19,6 +19,7 @@
   - Agent Card discovery (`GET /.well-known/agent.json`)
   - JSON-RPC 2.0 task delegation (`tasks/send`, `tasks/get`, `tasks/cancel`)
   - 5 built-in skills: claim/release resource, check conflict, query/send mailbox
+- **🔐 REST API Auth** — Optional Bearer / API key auth on mutating endpoints
 - **🔐 Dual Auth** — API key (`X-Api-Key`) or Bearer token (JWT/JWKS + external validator)
 - **💾 Multiple Backends** — SQLite (default), PostgreSQL, or managed remote provider
 - **📦 Embeddable** — Use as a Go library or standalone binary
@@ -70,6 +71,9 @@ provider = "sqlite"
 ```bash
 # REST API only (default port 8080)
 hearsay serve
+
+# With authentication and structured logging
+hearsay serve --auth-token my-secret-key --log-format json
 
 # With A2A server on separate port
 hearsay serve --a2a-addr localhost:8081 --a2a-api-key my-secret-key
@@ -204,6 +208,8 @@ See [sdk/typescript/README.md](sdk/typescript/README.md) for TypeScript client u
 | `HEARSAY_PROVIDER` | `sqlite`, `postgresql`, or `managed` |
 | `HEARSAY_SQLITE_PATH` | SQLite database path |
 | `HEARSAY_POSTGRESQL_URL` | PostgreSQL connection string |
+| `HEARSAY_AUTH_TOKEN` | REST API auth token (mutating endpoints) |
+| `HEARSAY_LOG_FORMAT` | `text` or `json` |
 | `HEARSAY_A2A_ADDR` | A2A server listen address |
 | `HEARSAY_A2A_API_KEY` | A2A API key |
 

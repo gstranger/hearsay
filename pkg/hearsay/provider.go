@@ -33,6 +33,9 @@ type Provider interface {
 	GetTaskHistory(ctx context.Context, namespace string, taskID string, limit int) ([]A2AMessage, error)
 	CreateArtifact(ctx context.Context, namespace string, taskID string, art A2AArtifact) error
 	GetArtifacts(ctx context.Context, namespace string, taskID string) ([]A2AArtifact, error)
+
+	// AppendAudit persists audit events to the audit log.
+	AppendAudit(ctx context.Context, namespaceID string, events []AuditEvent) error
 }
 
 type Namespace struct {

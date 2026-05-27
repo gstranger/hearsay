@@ -1,6 +1,7 @@
 package server
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -37,7 +38,8 @@ func (s *Server) handleSSE(w http.ResponseWriter, r *http.Request) {
 
 	events, err := s.provider.SubscribeEvents(r.Context(), namespace, since)
 	if err != nil {
-		fmt.Fprintf(w, "event: error\ndata: {\"error\":\"%s\"}\n\n", err.Error())
+		errJSON, _ := json.Marshal(map[string]string{"error": err.Error()})
+		fmt.Fprintf(w, "event: error\ndata: %s\n\n", errJSON)
 		if canFlush {
 			flusher.Flush()
 		}

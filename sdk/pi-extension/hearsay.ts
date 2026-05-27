@@ -46,7 +46,7 @@ async function ensureServe(cfg: ExtensionConfig, pi: ExtensionAPI): Promise<void
   try {
     if (bin.includes("/")) await access(bin); // absolute path check
   } catch {
-    console.warn("[hearsay] hearsay binary not found — install with:\n  go install github.com/thunder/hearsay/cmd/hearsay@latest");
+    console.warn("[hearsay] hearsay binary not found — install with:\n  go install github.com/gstranger/hearsay/cmd/hearsay@latest");
     return;
   }
 

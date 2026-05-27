@@ -7,7 +7,7 @@ Copy `hearsay.ts` to `.opencode/plugins/hearsay.ts` (project-local) or `~/.confi
 The extension needs `hearsay` binary in your `$PATH`. Install with:
 
 ```bash
-go install github.com/thunder/hearsay/cmd/hearsay@latest
+go install github.com/gstranger/hearsay/cmd/hearsay@latest
 ```
 
 ## Auto-start behavior

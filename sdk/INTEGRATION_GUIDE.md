@@ -67,7 +67,7 @@ for await (const message of query({
 ```
 
 **Setup:**
-1. Install the Go binary: `go install github.com/thunder/hearsay/cmd/hearsay@latest`
+1. Install the Go binary: `go install github.com/gstranger/hearsay/cmd/hearsay@latest`
 2. In your project directory: `hearsay init --provider sqlite --namespace org/repo/branch`
 3. **Start the server in another terminal:** `hearsay serve`
 4. `npm install @hearsay/sdk` and wire the hooks into your Claude Code harness
@@ -91,7 +91,7 @@ import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 ```
 
 **Setup:**
-1. Install the Go binary: `go install github.com/thunder/hearsay/cmd/hearsay@latest`
+1. Install the Go binary: `go install github.com/gstranger/hearsay/cmd/hearsay@latest`
 2. Copy `sdk/pi-extension/hearsay.ts` to `.pi/extensions/hearsay.ts`
 3. Set environment variables (optional — defaults work):
    ```bash
@@ -112,7 +112,7 @@ import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 OpenCode supports `tool.execute.before` hooks via plugins. Unlike pi, the hook API only supports **blocking** (throwing an error) — there's no native "warn but allow" return value.
 
 **Setup:**
-1. Install the Go binary: `go install github.com/thunder/hearsay/cmd/hearsay@latest`
+1. Install the Go binary: `go install github.com/gstranger/hearsay/cmd/hearsay@latest`
 2. Copy `sdk/opencode-extension/hearsay.ts` to `.opencode/plugins/hearsay.ts`
 3. Set environment variables (optional — defaults work):
    ```bash
@@ -144,7 +144,7 @@ OpenCode supports `tool.execute.before` hooks via plugins. Unlike pi, the hook A
 Cursor supports a `hooks.json` file that runs shell commands before/after tool use. Coordination is done via the Go CLI directly — no HTTP server.
 
 **Setup:**
-1. Install the Go binary: `go install github.com/thunder/hearsay/cmd/hearsay@latest`
+1. Install the Go binary: `go install github.com/gstranger/hearsay/cmd/hearsay@latest`
 2. `hearsay init` in your project directory
 3. Copy `sdk/cursor/hooks.json` to `.cursor/hooks.json`
 4. **No `serve` needed.** Cursor subcommands open SQLite directly.
@@ -231,7 +231,7 @@ path = ".hearsay.db"
 ```
 
 ### Which binary do I install?
-One binary: `go install github.com/thunder/hearsay/cmd/hearsay@latest`
+One binary: `go install github.com/gstranger/hearsay/cmd/hearsay@latest`
 
 It does everything: claims, queries, serves, watches, cursor hooks.
 

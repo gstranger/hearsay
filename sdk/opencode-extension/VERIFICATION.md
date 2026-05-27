@@ -26,7 +26,7 @@ Since we can't run OpenCode in CI, here's how to verify the plugin works end-to-
 ### Prerequisites
 
 1. Install OpenCode: https://opencode.ai
-2. Install hearsay: `go install github.com/thunder/hearsay/cmd/hearsay@latest`
+2. Install hearsay: `go install github.com/gstranger/hearsay/cmd/hearsay@latest`
 3. Have a project with `.opencode/plugins/` directory
 
 ### Setup

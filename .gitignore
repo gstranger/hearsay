@@ -1,5 +1,5 @@
 # Binaries
-agentstate
+hearsay
 *.exe
 *.dll
 *.so
@@ -19,10 +19,10 @@ node_modules/
 
 # Local database
 *.db
-.agentstate.db
+.hearsay.db
 
 # Local config with potential secrets
-.agentstate.toml
+.hearsay.toml
 
 # IDE
 .idea/

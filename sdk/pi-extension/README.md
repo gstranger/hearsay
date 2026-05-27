@@ -7,7 +7,7 @@ Copy `hearsay.ts` to `.pi/extensions/hearsay.ts` (project-local) or `~/.pi/agent
 The pi extension needs `hearsay` binary in your `$PATH`. Install with:
 
 ```bash
-go install github.com/thunder/hearsay/cmd/hearsay@latest
+go install github.com/gstranger/hearsay/cmd/hearsay@latest
 ```
 
 ## Auto-start behavior

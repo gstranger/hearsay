@@ -1,9 +1,9 @@
 name: coordination-etiquette
 version: "0.1.0"
 description: >
-  Teach agents how to coordinate with other agents using the agentstate
+  Teach agents how to coordinate with other agents using the hearsay
   claims protocol. Covers query-before-planning, intent-writing,
   conflict resolution, and graceful degradation.
 author: thunder
 requires:
-  - agentstate >= 0.1.0
+  - hearsay >= 0.1.0

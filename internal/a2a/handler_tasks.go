@@ -3,6 +3,7 @@ package a2a
 import (
 	"context"
 	"encoding/json"
+	"net/http"
 
 	"github.com/gstranger/hearsay/pkg/hearsay"
 )
@@ -88,6 +89,99 @@ func (s *Server) handleTasksSend(ctx context.Context, params json.RawMessage) (*
 	task.Artifacts = result.Artifacts
 
 	return NewResponse(req.ID, taskToJSON(task)), nil
+}
+
+// handleTasksSendSubscribe handles the A2A tasks/sendSubscribe streaming method.
+// It creates a task, starts execution in a goroutine, and streams progress via SSE.
+func (s *Server) handleTasksSendSubscribe(w http.ResponseWriter, r *http.Request, req JSONRPCRequest) {
+	var params taskParams
+	if err := json.Unmarshal(req.Params, &params); err != nil {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(JSONRPCResponse{
+			JSONRPC: "2.0",
+			ID:      req.ID,
+			Error:   NewError(-32602, "Invalid params: "+err.Error()),
+		})
+		return
+	}
+	if params.ID == "" {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(JSONRPCResponse{
+			JSONRPC: "2.0",
+			ID:      req.ID,
+			Error:   NewError(-32602, "Missing required param: id"),
+		})
+		return
+	}
+
+	task := NewTask(params.ID, params.SessionID, s.namespace)
+	if err := s.provider.CreateTask(r.Context(), s.namespace, taskToStorage(task)); err != nil {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(JSONRPCResponse{
+			JSONRPC: "2.0",
+			ID:      req.ID,
+			Error:   NewError(-32003, "Failed to create task: "+err.Error()),
+		})
+		return
+	}
+
+	// Append user message to history
+	msgJSON, _ := json.Marshal(params.Message)
+	_ = s.provider.AppendTaskHistory(r.Context(), s.namespace, task.ID, 0, hearsay.A2AMessage{
+		Role:  "user",
+		Parts: msgJSON,
+	})
+
+	flusher, ok := w.(http.Flusher)
+	if !ok {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(JSONRPCResponse{
+			JSONRPC: "2.0",
+			ID:      req.ID,
+			Error:   NewError(-32003, "Streaming not supported"),
+		})
+		return
+	}
+
+	sse := &SSEWriter{w: w, flusher: flusher, requestID: req.ID}
+	w.Header().Set("Content-Type", "text/event-stream")
+	w.Header().Set("Cache-Control", "no-cache")
+	w.WriteHeader(http.StatusOK)
+
+	executor := StartTaskExecution(r.Context(), task, params.Message, s)
+
+	for evt := range executor.Events() {
+		switch evt.Type {
+		case "status":
+			sse.WriteStatusUpdate(taskToJSON(evt.Task))
+		case "artifact":
+			// Store artifacts in the provider
+			for _, art := range evt.Artifacts {
+				partsJSON, _ := json.Marshal(art.Parts)
+				s.provider.CreateArtifact(r.Context(), s.namespace, task.ID, hearsay.A2AArtifact{
+					Name: art.Name, Description: art.Description, Parts: partsJSON,
+					Index: art.Index, Append: art.Append, LastChunk: art.LastChunk,
+				})
+			}
+			sse.WriteArtifactUpdate(taskToJSON(evt.Task))
+		case "error":
+			sse.WriteError(evt.Error)
+			// Store failed state if task is available
+			if evt.Task != nil {
+				_ = s.provider.UpdateTask(r.Context(), s.namespace, taskToStorage(evt.Task))
+			}
+			return
+		case "done":
+			// Store final state
+			_ = s.provider.UpdateTask(r.Context(), s.namespace, taskToStorage(evt.Task))
+			sse.WriteClose(taskToJSON(evt.Task))
+			return
+		}
+	}
 }
 
 func (s *Server) handleTasksGet(ctx context.Context, params json.RawMessage) (*JSONRPCResponse, error) {

@@ -84,6 +84,9 @@ hearsay serve --auth-token my-secret-key --log-format json --tls-auto
 # With rate limiting: 10 req/sec per agent, burst of 20
 hearsay serve --rate-limit 10 --rate-burst 20
 
+# With 30s agent death detection
+hearsay serve --agent-timeout 30
+
 # With A2A server on separate port (HTTPS)
 hearsay serve --a2a-addr localhost:8081 --a2a-api-key my-secret-key --tls-auto
 ```
@@ -227,6 +230,7 @@ See [sdk/typescript/README.md](sdk/typescript/README.md) for TypeScript client u
 | `HEARSAY_AUTH_TOKEN` | REST API auth token (mutating endpoints) |
 | `HEARSAY_RATE_LIMIT` | Max req/sec per agent (0 = unlimited) |
 | `HEARSAY_RATE_BURST` | Max burst size per agent |
+| `HEARSAY_AGENT_TIMEOUT` | Seconds without heartbeat before agent declared dead (0 = disabled) |
 | `HEARSAY_LOG_FORMAT` | `text` or `json` |
 | `HEARSAY_A2A_ADDR` | A2A server listen address |
 | `HEARSAY_A2A_API_KEY` | A2A API key |

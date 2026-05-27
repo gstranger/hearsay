@@ -103,6 +103,13 @@ hearsay query
 hearsay release <claim-id> --outcome succeeded
 ```
 
+### Check Runtime State
+
+```bash
+hearsay status
+hearsay status --verbose
+```
+
 ---
 
 ## A2A Protocol

@@ -96,9 +96,35 @@ func (p *Provider) migrate() error {
 			created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
 			PRIMARY KEY (task_id, name, index_num)
 		)`,
+		`CREATE TABLE IF NOT EXISTS audit_events (
+			id SERIAL PRIMARY KEY,
+			namespace TEXT NOT NULL,
+			timestamp TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+			level TEXT NOT NULL,
+			event_type TEXT NOT NULL,
+			agent_id TEXT,
+			resource_uri TEXT,
+			outcome TEXT,
+			metadata TEXT
+		)`,
+		`CREATE INDEX IF NOT EXISTS idx_audit_namespace ON audit_events(namespace)`,
+		`CREATE INDEX IF NOT EXISTS idx_audit_timestamp ON audit_events(namespace, timestamp)`,
 	}
 	for _, s := range schema {
 		if _, err := p.db.Exec(s); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (p *Provider) AppendAudit(ctx context.Context, namespaceID string, events []hearsay.AuditEvent) error {
+	for _, e := range events {
+		_, err := p.db.ExecContext(ctx,
+			`INSERT INTO audit_events (namespace, timestamp, level, event_type, agent_id, resource_uri, outcome, metadata)
+			 VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+			namespaceID, e.Timestamp, e.Level, e.EventType, e.AgentID, e.ResourceURI, e.Outcome, e.Metadata)
+		if err != nil {
 			return err
 		}
 	}
@@ -126,6 +152,9 @@ func (p *Provider) DeleteNamespace(ctx context.Context, namespaceID string) erro
 		return err
 	}
 	if _, err := p.db.ExecContext(ctx, "DELETE FROM mailbox_messages WHERE namespace = $1", namespaceID); err != nil {
+		return err
+	}
+	if _, err := p.db.ExecContext(ctx, "DELETE FROM audit_events WHERE namespace = $1", namespaceID); err != nil {
 		return err
 	}
 	_, err := p.db.ExecContext(ctx, "DELETE FROM namespaces WHERE id = $1", namespaceID)

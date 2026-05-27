@@ -282,6 +282,41 @@ func (p *Provider) AgentState(ctx context.Context, namespaceID string, agentID s
 }
 
 func (p *Provider) ReleaseExpired(ctx context.Context, namespaceID string, before time.Time) error {
+	// Query all claim messages in the namespace
+	rows, err := p.db.QueryContext(ctx,
+		"SELECT offset, payload FROM messages WHERE namespace = ? AND type = 'claim'",
+		namespaceID)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+
+	var toDelete []int64
+	for rows.Next() {
+		var offset int64
+		var payload []byte
+		if err := rows.Scan(&offset, &payload); err != nil {
+			continue
+		}
+		var claim hearsay.Claim
+		if err := json.Unmarshal(payload, &claim); err != nil {
+			continue
+		}
+		if claim.CreatedAt.Add(time.Duration(claim.TTLSeconds) * time.Second).Before(before) {
+			toDelete = append(toDelete, offset)
+		}
+	}
+	rows.Close()
+
+	// Delete expired claims and their corresponding release messages
+	for _, offset := range toDelete {
+		_, err := p.db.ExecContext(ctx,
+			"DELETE FROM messages WHERE namespace = ? AND offset = ?",
+			namespaceID, offset)
+		if err != nil {
+			return err
+		}
+	}
 	return nil
 }
 

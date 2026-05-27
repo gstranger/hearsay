@@ -19,6 +19,7 @@ type Provider struct {
 	a2aTasks        map[string]*hearsay.A2ATask
 	a2aHistory      map[string][]hearsay.A2AMessage
 	a2aArtifacts    map[string][]hearsay.A2AArtifact
+	auditEvents    map[string][]hearsay.AuditEvent
 }
 
 func New() *Provider {
@@ -30,6 +31,7 @@ func New() *Provider {
 		a2aTasks:        make(map[string]*hearsay.A2ATask),
 		a2aHistory:      make(map[string][]hearsay.A2AMessage),
 		a2aArtifacts:    make(map[string][]hearsay.A2AArtifact),
+		auditEvents:    make(map[string][]hearsay.AuditEvent),
 	}
 }
 
@@ -322,4 +324,11 @@ func containsType(types []hearsay.MessageType, t hearsay.MessageType) bool {
 		}
 	}
 	return false
+}
+
+func (p *Provider) AppendAudit(ctx context.Context, namespaceID string, events []hearsay.AuditEvent) error {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.auditEvents[namespaceID] = append(p.auditEvents[namespaceID], events...)
+	return nil
 }

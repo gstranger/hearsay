@@ -328,6 +328,27 @@ func (p *Provider) GetArtifacts(ctx context.Context, namespace string, taskID st
 	return result, nil
 }
 
+func (p *Provider) AppendAudit(ctx context.Context, namespaceID string, events []hearsay.AuditEvent) error {
+	body, _ := json.Marshal(events)
+	req, err := http.NewRequestWithContext(ctx, "POST", p.endpoint+"/audit?namespace="+namespaceID, bytes.NewReader(body))
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	if p.token != "" {
+		req.Header.Set("Authorization", "Bearer "+p.token)
+	}
+	resp, err := p.client.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("managed AppendAudit: %s", resp.Status)
+	}
+	return nil
+}
+
 func (p *Provider) post(ctx context.Context, path string, body []byte) error {
 	req, err := http.NewRequestWithContext(ctx, "POST", p.endpoint+path, bytes.NewReader(body))
 	if err != nil {

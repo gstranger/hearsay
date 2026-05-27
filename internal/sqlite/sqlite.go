@@ -102,6 +102,21 @@ CREATE TABLE IF NOT EXISTS a2a_artifacts (
     created_at  DATETIME DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (task_id, name, index_num)
 );
+
+CREATE TABLE IF NOT EXISTS audit_events (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    namespace TEXT NOT NULL,
+    timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+    level TEXT NOT NULL,
+    event_type TEXT NOT NULL,
+    agent_id TEXT,
+    resource_uri TEXT,
+    outcome TEXT,
+    metadata TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_audit_namespace ON audit_events(namespace);
+CREATE INDEX IF NOT EXISTS idx_audit_timestamp ON audit_events(namespace, timestamp);
 `
 	_, err := p.db.Exec(schema)
 	return err
@@ -110,6 +125,19 @@ CREATE TABLE IF NOT EXISTS a2a_artifacts (
 func (p *Provider) CreateNamespace(ctx context.Context, ns hearsay.Namespace) error {
 	_, err := p.db.ExecContext(ctx, "INSERT INTO namespaces (id, created_at) VALUES (?, ?)", ns.ID, ns.CreatedAt)
 	return err
+}
+
+func (p *Provider) AppendAudit(ctx context.Context, namespaceID string, events []hearsay.AuditEvent) error {
+	for _, e := range events {
+		_, err := p.db.ExecContext(ctx,
+			`INSERT INTO audit_events (namespace, timestamp, level, event_type, agent_id, resource_uri, outcome, metadata)
+			 VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+			namespaceID, e.Timestamp, e.Level, e.EventType, e.AgentID, e.ResourceURI, e.Outcome, e.Metadata)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (p *Provider) DeleteNamespace(ctx context.Context, namespaceID string) error {
@@ -133,6 +161,9 @@ func (p *Provider) DeleteNamespace(ctx context.Context, namespaceID string) erro
 		return err
 	}
 	if _, err := tx.ExecContext(ctx, "DELETE FROM mailbox_messages WHERE namespace = ?", namespaceID); err != nil {
+		return err
+	}
+	if _, err := tx.ExecContext(ctx, "DELETE FROM audit_events WHERE namespace = ?", namespaceID); err != nil {
 		return err
 	}
 	if _, err := tx.ExecContext(ctx, "DELETE FROM namespaces WHERE id = ?", namespaceID); err != nil {

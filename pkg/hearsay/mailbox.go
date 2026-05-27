@@ -1,4 +1,4 @@
-package agentstate
+package hearsay
 
 const (
 	MsgMailboxSend    MessageType = "mailbox_send"

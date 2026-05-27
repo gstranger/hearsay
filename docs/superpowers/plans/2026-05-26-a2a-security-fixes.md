@@ -31,7 +31,7 @@
 - [ ] **Step 1: Add jwt/v5 dependency**
 
 ```bash
-cd /Users/pj/Documents/thunder/agentstate
+cd /Users/pj/Documents/thunder/hearsay
 go get github.com/golang-jwt/jwt/v5
 ```
 
@@ -40,7 +40,7 @@ Expected: `go.mod` updated with `github.com/golang-jwt/jwt/v5 v5.x.x`
 - [ ] **Step 2: Verify build still passes**
 
 ```bash
-cd /Users/pj/Documents/thunder/agentstate
+cd /Users/pj/Documents/thunder/hearsay
 go build ./...
 ```
 
@@ -49,7 +49,7 @@ Expected: PASS (no compile errors)
 - [ ] **Step 3: Commit**
 
 ```bash
-cd /Users/pj/Documents/thunder/agentstate
+cd /Users/pj/Documents/thunder/hearsay
 git add go.mod go.sum
 git commit -m "deps: add golang-jwt/jwt/v5 for A2A Bearer validation"
 ```
@@ -477,7 +477,7 @@ func TestAuthMiddlewareExternalBearer(t *testing.T) {
 - [ ] **Step 5: Run auth tests**
 
 ```bash
-cd /Users/pj/Documents/thunder/agentstate
+cd /Users/pj/Documents/thunder/hearsay
 go test ./internal/a2a/ -run TestAuth -v
 ```
 
@@ -486,7 +486,7 @@ Expected: All 5 tests PASS
 - [ ] **Step 6: Commit**
 
 ```bash
-cd /Users/pj/Documents/thunder/agentstate
+cd /Users/pj/Documents/thunder/hearsay
 git add internal/a2a/auth.go internal/a2a/auth_test.go
 git commit -m "feat(a2a): implement JWT and external Bearer token validation"
 ```
@@ -509,7 +509,7 @@ for _, art := range result.Artifacts {
 	if err != nil {
 		return nil, NewError(-32003, "Failed to marshal artifact: "+err.Error())
 	}
-	if err := s.provider.CreateArtifact(ctx, s.namespace, task.ID, agentstate.A2AArtifact{
+	if err := s.provider.CreateArtifact(ctx, s.namespace, task.ID, hearsay.A2AArtifact{
 		Name: art.Name, Description: art.Description, Parts: partsJSON,
 		Index: art.Index, Append: art.Append, LastChunk: art.LastChunk,
 	}); err != nil {
@@ -537,7 +537,7 @@ Replace the cancel body:
 ```go
 	task := storageToTask(st)
 	if task.ClaimID != "" {
-		if err := s.client.Release(ctx, task.ClaimID, agentstate.OutcomeAbandoned); err != nil {
+		if err := s.client.Release(ctx, task.ClaimID, hearsay.OutcomeAbandoned); err != nil {
 			// Log warning but proceed with cancel — release failure shouldn't prevent cancel
 			// In production, this should be logged to a structured logger
 			_ = err
@@ -556,7 +556,7 @@ Replace the cancel body:
 - [ ] **Step 4: Run tests**
 
 ```bash
-cd /Users/pj/Documents/thunder/agentstate
+cd /Users/pj/Documents/thunder/hearsay
 go test ./internal/a2a/ -v
 ```
 
@@ -565,7 +565,7 @@ Expected: All tests PASS
 - [ ] **Step 5: Commit**
 
 ```bash
-cd /Users/pj/Documents/thunder/agentstate
+cd /Users/pj/Documents/thunder/hearsay
 git add internal/a2a/handler_tasks.go
 git commit -m "fix(a2a): check all storage operation errors in task handlers"
 ```
@@ -586,7 +586,7 @@ func (s *Server) skillClaimResource(ctx context.Context, task *Task, params *Ski
 	req := mapToClaimRequest(params)
 	resp, err := s.client.Claim(ctx, req)
 	if err != nil {
-		if _, ok := err.(*agentstate.ConflictError); ok {
+		if _, ok := err.(*hearsay.ConflictError); ok {
 			// Do NOT set task.ClaimID — the claim was not granted
 			reportJSON, _ := json.Marshal(resp.Conflict)
 			task.Artifacts = []Artifact{{
@@ -609,7 +609,7 @@ func (s *Server) skillClaimResource(ctx context.Context, task *Task, params *Ski
 - [ ] **Step 2: Run tests**
 
 ```bash
-cd /Users/pj/Documents/thunder/agentstate
+cd /Users/pj/Documents/thunder/hearsay
 go test ./internal/a2a/ -v
 ```
 
@@ -618,7 +618,7 @@ Expected: All tests PASS
 - [ ] **Step 3: Commit**
 
 ```bash
-cd /Users/pj/Documents/thunder/agentstate
+cd /Users/pj/Documents/thunder/hearsay
 git add internal/a2a/handler_skills.go
 git commit -m "fix(a2a): don't store ClaimID when claim conflicts"
 ```
@@ -669,7 +669,7 @@ func (p *Provider) DeleteNamespace(ctx context.Context, namespaceID string) erro
 - [ ] **Step 2: Run SQLite tests**
 
 ```bash
-cd /Users/pj/Documents/thunder/agentstate
+cd /Users/pj/Documents/thunder/hearsay
 go test ./internal/sqlite/ -v
 ```
 
@@ -678,7 +678,7 @@ Expected: PASS
 - [ ] **Step 3: Run full test suite**
 
 ```bash
-cd /Users/pj/Documents/thunder/agentstate
+cd /Users/pj/Documents/thunder/hearsay
 go test ./...
 ```
 
@@ -687,7 +687,7 @@ Expected: ALL PASS
 - [ ] **Step 4: Commit**
 
 ```bash
-cd /Users/pj/Documents/thunder/agentstate
+cd /Users/pj/Documents/thunder/hearsay
 git add internal/sqlite/sqlite.go
 git commit -m "fix(sqlite): transactional DeleteNamespace with A2A cleanup"
 ```
@@ -699,7 +699,7 @@ git commit -m "fix(sqlite): transactional DeleteNamespace with A2A cleanup"
 - [ ] **Step 1: Full build + test**
 
 ```bash
-cd /Users/pj/Documents/thunder/agentstate
+cd /Users/pj/Documents/thunder/hearsay
 go build ./... && go test ./... -v 2>&1 | tail -30
 ```
 
@@ -708,7 +708,7 @@ Expected: All packages PASS
 - [ ] **Step 2: Commit design docs**
 
 ```bash
-cd /Users/pj/Documents/thunder/agentstate
+cd /Users/pj/Documents/thunder/hearsay
 git add docs/superpowers/specs/2026-05-26-a2a-security-fixes-design.md
 git commit -m "docs: A2A security fixes design spec"
 ```
@@ -716,7 +716,7 @@ git commit -m "docs: A2A security fixes design spec"
 - [ ] **Step 3: Save plan**
 
 ```bash
-cd /Users/pj/Documents/thunder/agentstate
+cd /Users/pj/Documents/thunder/hearsay
 cp docs/superpowers/specs/2026-05-26-a2a-security-fixes-design.md docs/superpowers/plans/2026-05-26-a2a-security-fixes.md
 # Edit the copy to be the plan format... actually just save the plan separately
 ```
@@ -724,7 +724,7 @@ cp docs/superpowers/specs/2026-05-26-a2a-security-fixes-design.md docs/superpowe
 Actually, save this plan file:
 
 ```bash
-cd /Users/pj/Documents/thunder/agentstate
+cd /Users/pj/Documents/thunder/hearsay
 git add docs/superpowers/plans/2026-05-26-a2a-security-fixes.md
 git commit -m "docs: A2A security fixes implementation plan"
 ```

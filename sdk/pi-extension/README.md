@@ -1,26 +1,26 @@
 # pi Extension
 
-Copy `agentstate.ts` to `.pi/extensions/agentstate.ts` (project-local) or `~/.pi/agent/extensions/agentstate.ts` (global).
+Copy `hearsay.ts` to `.pi/extensions/hearsay.ts` (project-local) or `~/.pi/agent/extensions/hearsay.ts` (global).
 
 ## Requirements
 
-The pi extension needs `agentstate` binary in your `$PATH`. Install with:
+The pi extension needs `hearsay` binary in your `$PATH`. Install with:
 
 ```bash
-go install github.com/thunder/agentstate/cmd/agentstate@latest
+go install github.com/thunder/hearsay/cmd/hearsay@latest
 ```
 
 ## Auto-start behavior
 
-The extension automatically starts `agentstate serve` in the background if:
+The extension automatically starts `hearsay serve` in the background if:
 - No server is running on the configured endpoint (default `localhost:8080`)
-- The `agentstate` binary is found in `$PATH`
+- The `hearsay` binary is found in `$PATH`
 
-If `.agentstate.toml` does not exist, the extension auto-runs `agentstate init --provider sqlite --namespace <namespace>` first.
+If `.hearsay.toml` does not exist, the extension auto-runs `hearsay init --provider sqlite --namespace <namespace>` first.
 
 You can override the binary path:
 ```bash
-export AGENTSTATE_BINARY=/path/to/agentstate
+export HEARSAY_BINARY=/path/to/hearsay
 ```
 
 ## Configuration
@@ -28,11 +28,11 @@ export AGENTSTATE_BINARY=/path/to/agentstate
 Set environment variables (optional — defaults shown):
 
 ```bash
-export AGENTSTATE_ENDPOINT=http://localhost:8080
-export AGENTSTATE_NAMESPACE=org/repo/branch
-export AGENTSTATE_AGENT_ID=pi:gpt-4:sess_abc123
-export AGENTSTATE_TTL=300
-export AGENTSTATE_CLAIM_ON_READ=false
+export HEARSAY_ENDPOINT=http://localhost:8080
+export HEARSAY_NAMESPACE=org/repo/branch
+export HEARSAY_AGENT_ID=pi:gpt-4:sess_abc123
+export HEARSAY_TTL=300
+export HEARSAY_CLAIM_ON_READ=false
 ```
 
 ## Behavior

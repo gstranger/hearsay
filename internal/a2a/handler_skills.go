@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/thunder/agentstate/pkg/agentstate"
+	"github.com/gstranger/hearsay/pkg/hearsay"
 )
 
 func (s *Server) executeSkill(ctx context.Context, task *Task, msg Message) (*Task, error) {
@@ -39,7 +39,7 @@ func (s *Server) skillClaimResource(ctx context.Context, task *Task, params *Ski
 	req := mapToClaimRequest(params)
 	resp, err := s.client.Claim(ctx, req)
 	if err != nil {
-		if _, ok := err.(*agentstate.ConflictError); ok {
+		if _, ok := err.(*hearsay.ConflictError); ok {
 			// Do NOT set task.ClaimID — the claim was not granted
 			reportJSON, _ := json.Marshal(resp.Conflict)
 			task.Artifacts = []Artifact{{
@@ -59,9 +59,9 @@ func (s *Server) skillClaimResource(ctx context.Context, task *Task, params *Ski
 }
 
 func (s *Server) skillReleaseResource(ctx context.Context, task *Task, params *SkillParams) (*Task, error) {
-	outcome := agentstate.Outcome(params.Outcome)
+	outcome := hearsay.Outcome(params.Outcome)
 	if outcome == "" {
-		outcome = agentstate.OutcomeSucceeded
+		outcome = hearsay.OutcomeSucceeded
 	}
 	if err := s.client.Release(ctx, params.ClaimID, outcome); err != nil {
 		return nil, err
@@ -70,7 +70,7 @@ func (s *Server) skillReleaseResource(ctx context.Context, task *Task, params *S
 }
 
 func (s *Server) skillCheckConflict(ctx context.Context, task *Task, params *SkillParams) (*Task, error) {
-	report, err := s.client.CheckConflict(ctx, params.ResourceURI, agentstate.Operation(params.Operation))
+	report, err := s.client.CheckConflict(ctx, params.ResourceURI, hearsay.Operation(params.Operation))
 	if err != nil {
 		return nil, err
 	}
@@ -83,7 +83,7 @@ func (s *Server) skillCheckConflict(ctx context.Context, task *Task, params *Ski
 }
 
 func (s *Server) skillQueryMailbox(ctx context.Context, task *Task, params *SkillParams) (*Task, error) {
-	msgs, err := s.provider.GetMailbox(ctx, s.namespace, params.AgentID, agentstate.MailboxQueryOpts{Unread: params.UnreadOnly})
+	msgs, err := s.provider.GetMailbox(ctx, s.namespace, params.AgentID, hearsay.MailboxQueryOpts{Unread: params.UnreadOnly})
 	if err != nil {
 		return nil, err
 	}

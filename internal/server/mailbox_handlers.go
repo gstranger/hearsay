@@ -4,8 +4,8 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"github.com/thunder/agentstate/internal/mailbox"
-	"github.com/thunder/agentstate/pkg/agentstate"
+	"github.com/gstranger/hearsay/internal/mailbox"
+	"github.com/gstranger/hearsay/pkg/hearsay"
 )
 
 type sendMessageRequest struct {
@@ -64,7 +64,7 @@ func (s *Server) handleGetMailbox(w http.ResponseWriter, r *http.Request) {
 	}
 
 	svc := mailbox.New(s.provider)
-	msgs, err := svc.GetMailbox(r.Context(), namespace, agentID, agentstate.MailboxQueryOpts{
+	msgs, err := svc.GetMailbox(r.Context(), namespace, agentID, hearsay.MailboxQueryOpts{
 		Unread:        unread,
 		IncludeClaims: includeClaims,
 	})

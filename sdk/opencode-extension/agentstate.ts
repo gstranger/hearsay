@@ -8,20 +8,20 @@ interface ExtensionConfig {
   agentId: string;
   defaultTTL: number;
   claimOnRead: boolean;
-  agentstateBinary: string;
+  hearsayBinary: string;
   onConflict: "block" | "warn" | "allow";
 }
 
 function getConfig(): ExtensionConfig {
   return {
-    endpoint: process.env.AGENTSTATE_ENDPOINT || "http://localhost:8080",
-    namespace: process.env.AGENTSTATE_NAMESPACE || "default",
-    agentId: process.env.AGENTSTATE_AGENT_ID || `opencode:${Date.now()}`,
-    defaultTTL: parseInt(process.env.AGENTSTATE_TTL || "300", 10),
-    claimOnRead: process.env.AGENTSTATE_CLAIM_ON_READ === "true",
-    agentstateBinary: process.env.AGENTSTATE_BINARY || "agentstate",
-    onConflict: ["block", "warn", "allow"].includes(process.env.AGENTSTATE_ON_CONFLICT as string)
-      ? (process.env.AGENTSTATE_ON_CONFLICT as ExtensionConfig["onConflict"])
+    endpoint: process.env.HEARSAY_ENDPOINT || "http://localhost:8080",
+    namespace: process.env.HEARSAY_NAMESPACE || "default",
+    agentId: process.env.HEARSAY_AGENT_ID || `opencode:${Date.now()}`,
+    defaultTTL: parseInt(process.env.HEARSAY_TTL || "300", 10),
+    claimOnRead: process.env.HEARSAY_CLAIM_ON_READ === "true",
+    hearsayBinary: process.env.HEARSAY_BINARY || "hearsay",
+    onConflict: ["block", "warn", "allow"].includes(process.env.HEARSAY_ON_CONFLICT as string)
+      ? (process.env.HEARSAY_ON_CONFLICT as ExtensionConfig["onConflict"])
       : "block",
   };
 }
@@ -38,17 +38,17 @@ async function isServeRunning(endpoint: string): Promise<boolean> {
 async function ensureServe(cfg: ExtensionConfig): Promise<void> {
   if (await isServeRunning(cfg.endpoint)) return;
 
-  const bin = cfg.agentstateBinary;
+  const bin = cfg.hearsayBinary;
   try {
     if (bin.includes("/")) await access(bin);
   } catch {
-    console.warn("[agentstate] agentstate binary not found — install with:\n  go install github.com/thunder/agentstate/cmd/agentstate@latest");
+    console.warn("[hearsay] hearsay binary not found — install with:\n  go install github.com/gstranger/hearsay/cmd/hearsay@latest");
     return;
   }
 
   let initNeeded = false;
   try {
-    await access(".agentstate.toml");
+    await access(".hearsay.toml");
   } catch {
     initNeeded = true;
   }
@@ -60,7 +60,7 @@ async function ensureServe(cfg: ExtensionConfig): Promise<void> {
         child.on("close", (code) => (code === 0 ? resolve() : reject(new Error(`init exited ${code}`))));
       });
     } catch {
-      console.warn("[agentstate] failed to auto-init config");
+      console.warn("[hearsay] failed to auto-init config");
     }
   }
 
@@ -73,12 +73,12 @@ async function ensureServe(cfg: ExtensionConfig): Promise<void> {
 
   for (let i = 0; i < 20; i++) {
     if (await isServeRunning(cfg.endpoint)) {
-      console.log("[agentstate] auto-started agentstate serve");
+      console.log("[hearsay] auto-started hearsay serve");
       return;
     }
     await new Promise((r) => setTimeout(r, 100));
   }
-  console.warn("[agentstate] serve did not start in time");
+  console.warn("[hearsay] serve did not start in time");
 }
 
 async function claimResource(
@@ -113,7 +113,7 @@ async function claimResource(
     }
     return { ok: true, claimId: body.claim_id };
   } catch (err) {
-    return { ok: true, reason: `agentstate unavailable (${err})` };
+    return { ok: true, reason: `hearsay unavailable (${err})` };
   }
 }
 
@@ -215,7 +215,7 @@ export default async function () {
       if (!result.ok) {
         switch (cfg.onConflict) {
           case "block":
-            throw new Error(result.reason || "Blocked by agentstate");
+            throw new Error(result.reason || "Blocked by hearsay");
           case "allow":
             return; // Silently proceed
           case "warn":

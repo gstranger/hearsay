@@ -1,4 +1,4 @@
-package agentstate
+package hearsay
 
 import (
 	"fmt"

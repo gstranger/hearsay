@@ -1,4 +1,4 @@
-# agentstate
+# hearsay
 
 [![Go Report Card](https://goreportcard.com/badge/github.com/gstranger/hearsay)](https://goreportcard.com/report/github.com/gstranger/hearsay)
 [![GoDoc](https://godoc.org/github.com/gstranger/hearsay?status.svg)](https://godoc.org/github.com/gstranger/hearsay)
@@ -6,7 +6,7 @@
 
 > **Agent coordination layer** — track resource claims across agents, sessions, and machines. Now with [A2A (Agent-to-Agent)](https://github.com/google/A2A) protocol support.
 
-`agentstate` is a lightweight, embeddable coordination service for AI agents. It prevents conflicts when multiple agents work on the same codebase by tracking who owns what, for how long, and why. With built-in A2A compliance, external agents can discover capabilities via an Agent Card and delegate coordination tasks through JSON-RPC.
+`hearsay` is a lightweight, embeddable coordination service for AI agents. It prevents conflicts when multiple agents work on the same codebase by tracking who owns what, for how long, and why. With built-in A2A compliance, external agents can discover capabilities via an Agent Card and delegate coordination tasks through JSON-RPC.
 
 ---
 
@@ -31,7 +31,7 @@
 ### Installation
 
 ```bash
-go install github.com/gstranger/hearsay/cmd/agentstate@latest
+go install github.com/gstranger/hearsay/cmd/hearsay@latest
 ```
 
 Or clone and build:
@@ -39,16 +39,16 @@ Or clone and build:
 ```bash
 git clone https://github.com/gstranger/hearsay.git
 cd hearsay
-go build ./cmd/agentstate
+go build ./cmd/hearsay
 ```
 
 ### Initialize
 
 ```bash
-agentstate init
+hearsay init
 ```
 
-Creates `.agentstate.toml`:
+Creates `.hearsay.toml`:
 
 ```toml
 version = 1
@@ -57,7 +57,7 @@ provider = "sqlite"
 
 [provider_config]
   [provider_config.sqlite]
-    path = ".agentstate.db"
+    path = ".hearsay.db"
 
 [defaults]
   ttl_seconds = 300
@@ -69,35 +69,35 @@ provider = "sqlite"
 
 ```bash
 # REST API only (default port 8080)
-agentstate serve
+hearsay serve
 
 # With A2A server on separate port
-agentstate serve --a2a-addr localhost:8081 --a2a-api-key my-secret-key
+hearsay serve --a2a-addr localhost:8081 --a2a-api-key my-secret-key
 ```
 
 ### Claim a Resource
 
 ```bash
-agentstate claim file://src/api.go --agent-id agent-a --operation write --intent "refactoring"
+hearsay claim file://src/api.go --agent-id agent-a --operation write --intent "refactoring"
 ```
 
 ### Query Active Claims
 
 ```bash
-agentstate query
+hearsay query
 ```
 
 ### Release a Claim
 
 ```bash
-agentstate release <claim-id> --outcome succeeded
+hearsay release <claim-id> --outcome succeeded
 ```
 
 ---
 
 ## A2A Protocol
 
-When started with `--a2a-addr`, agentstate exposes an A2A-compliant server.
+When started with `--a2a-addr`, hearsay exposes an A2A-compliant server.
 
 ### Agent Card
 
@@ -200,12 +200,12 @@ See [sdk/typescript/README.md](sdk/typescript/README.md) for TypeScript client u
 
 | Variable | Description |
 |---|---|
-| `AGENTSTATE_NAMESPACE` | Default namespace |
-| `AGENTSTATE_PROVIDER` | `sqlite`, `postgresql`, or `managed` |
-| `AGENTSTATE_SQLITE_PATH` | SQLite database path |
-| `AGENTSTATE_POSTGRESQL_URL` | PostgreSQL connection string |
-| `AGENTSTATE_A2A_ADDR` | A2A server listen address |
-| `AGENTSTATE_A2A_API_KEY` | A2A API key |
+| `HEARSAY_NAMESPACE` | Default namespace |
+| `HEARSAY_PROVIDER` | `sqlite`, `postgresql`, or `managed` |
+| `HEARSAY_SQLITE_PATH` | SQLite database path |
+| `HEARSAY_POSTGRESQL_URL` | PostgreSQL connection string |
+| `HEARSAY_A2A_ADDR` | A2A server listen address |
+| `HEARSAY_A2A_API_KEY` | A2A API key |
 
 ### TOML Config
 
@@ -216,11 +216,11 @@ provider = "postgresql"
 
 [provider_config]
   [provider_config.postgresql]
-    url = "postgres://user:pass@localhost/agentstate"
+    url = "postgres://user:pass@localhost/hearsay"
 
 [a2a]
   addr = "localhost:8081"
-  api_key = "${AGENTSTATE_A2A_API_KEY}"  # read from env
+  api_key = "${HEARSAY_A2A_API_KEY}"  # read from env
   bearer_jwks_url = "https://auth.example.com/.well-known/jwks.json"
 
 [defaults]
@@ -244,7 +244,7 @@ provider = "postgresql"
          └───────────────────────┼───────────────────────┘
                                  │
                     ┌────────────▼────────────┐
-                    │      agentstate         │
+                    │      hearsay         │
                     │   (Go library/binary)   │
                     └────────────┬────────────┘
                                  │
@@ -268,17 +268,17 @@ go test ./...
 go test -race ./...
 
 # Build binary
-go build ./cmd/agentstate
+go build ./cmd/hearsay
 
 # Run locally
-./agentstate serve --a2a-addr localhost:8081
+./hearsay serve --a2a-addr localhost:8081
 ```
 
 ### Project Structure
 
 ```
 .
-├── cmd/agentstate/          # CLI entrypoint
+├── cmd/hearsay/          # CLI entrypoint
 ├── internal/
 │   ├── a2a/                 # A2A protocol implementation
 │   │   ├── agentcard.go     # Agent Card generator
@@ -292,7 +292,7 @@ go build ./cmd/agentstate
 │   ├── memory/              # In-memory provider (tests)
 │   ├── server/              # REST HTTP handlers
 │   └── mailbox/             # Mailbox implementation
-├── pkg/agentstate/          # Public API types & client
+├── pkg/hearsay/          # Public API types & client
 ├── sdk/
 │   ├── typescript/          # TypeScript SDK
 │   └── cursor/              # Cursor IDE extension

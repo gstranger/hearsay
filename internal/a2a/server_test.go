@@ -8,15 +8,15 @@ import (
 	"testing"
 	"time"
 
-	"github.com/thunder/agentstate/internal/memory"
-	"github.com/thunder/agentstate/pkg/agentstate"
+	"github.com/gstranger/hearsay/internal/memory"
+	"github.com/gstranger/hearsay/pkg/hearsay"
 )
 
 func TestServerAgentCard(t *testing.T) {
-	cfg := &agentstate.A2AConfig{Addr: "localhost:8081", APIKey: "ak"}
+	cfg := &hearsay.A2AConfig{Addr: "localhost:8081", APIKey: "ak"}
 	p := memory.New()
-	_ = p.CreateNamespace(context.Background(), agentstate.Namespace{ID: "test", CreatedAt: time.Now()})
-	client := agentstate.NewClient(p, "test")
+	_ = p.CreateNamespace(context.Background(), hearsay.Namespace{ID: "test", CreatedAt: time.Now()})
+	client := hearsay.NewClient(p, "test")
 	mw := &AuthMiddleware{APIKey: "ak"}
 	srv := NewServer(cfg, client, p, mw, "test")
 
@@ -31,16 +31,16 @@ func TestServerAgentCard(t *testing.T) {
 	if err := json.Unmarshal(rec.Body.Bytes(), &card); err != nil {
 		t.Fatal(err)
 	}
-	if card.Name != "agentstate-coordinator" {
+	if card.Name != "hearsay-coordinator" {
 		t.Fatal("name mismatch")
 	}
 }
 
 func TestServerJSONRPC(t *testing.T) {
-	cfg := &agentstate.A2AConfig{Addr: "localhost:8081", APIKey: "ak"}
+	cfg := &hearsay.A2AConfig{Addr: "localhost:8081", APIKey: "ak"}
 	p := memory.New()
-	_ = p.CreateNamespace(context.Background(), agentstate.Namespace{ID: "test", CreatedAt: time.Now()})
-	client := agentstate.NewClient(p, "test")
+	_ = p.CreateNamespace(context.Background(), hearsay.Namespace{ID: "test", CreatedAt: time.Now()})
+	client := hearsay.NewClient(p, "test")
 	mw := &AuthMiddleware{APIKey: "ak"}
 	srv := NewServer(cfg, client, p, mw, "test")
 

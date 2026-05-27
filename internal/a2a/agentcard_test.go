@@ -3,13 +3,13 @@ package a2a
 import (
 	"testing"
 
-	"github.com/thunder/agentstate/pkg/agentstate"
+	"github.com/gstranger/hearsay/pkg/hearsay"
 )
 
 func TestGenerateAgentCard(t *testing.T) {
-	cfg := &agentstate.A2AConfig{Addr: "localhost:8081", APIKey: "secret"}
+	cfg := &hearsay.A2AConfig{Addr: "localhost:8081", APIKey: "secret"}
 	card := GenerateAgentCard(cfg, "1.0.0")
-	if card.Name != "agentstate-coordinator" { t.Fatal("name mismatch") }
+	if card.Name != "hearsay-coordinator" { t.Fatal("name mismatch") }
 	if card.URL != "http://localhost:8081/a2a" { t.Fatalf("url mismatch: got %s", card.URL) }
 	if len(card.Skills) != 5 { t.Fatalf("expected 5 skills, got %d", len(card.Skills)) }
 	if card.Capabilities.Streaming { t.Fatal("streaming should be false in v1") }
@@ -20,7 +20,7 @@ func TestGenerateAgentCard(t *testing.T) {
 }
 
 func TestGenerateAgentCardBearerOnly(t *testing.T) {
-	cfg := &agentstate.A2AConfig{Addr: "localhost:8081", BearerJWKSURL: "https://auth.example.com/jwks"}
+	cfg := &hearsay.A2AConfig{Addr: "localhost:8081", BearerJWKSURL: "https://auth.example.com/jwks"}
 	card := GenerateAgentCard(cfg, "1.0.0")
 	if len(card.Authentication.Schemes) != 1 || card.Authentication.Schemes[0] != "Bearer" {
 		t.Fatalf("expected Bearer scheme, got %v", card.Authentication.Schemes)
@@ -28,7 +28,7 @@ func TestGenerateAgentCardBearerOnly(t *testing.T) {
 }
 
 func TestGenerateAgentCardBothAuth(t *testing.T) {
-	cfg := &agentstate.A2AConfig{Addr: "localhost:8081", APIKey: "secret", BearerValidatorURL: "https://auth.example.com/verify"}
+	cfg := &hearsay.A2AConfig{Addr: "localhost:8081", APIKey: "secret", BearerValidatorURL: "https://auth.example.com/verify"}
 	card := GenerateAgentCard(cfg, "1.0.0")
 	if len(card.Authentication.Schemes) != 2 {
 		t.Fatalf("expected 2 schemes, got %d", len(card.Authentication.Schemes))

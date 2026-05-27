@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/thunder/agentstate/internal/memory"
-	"github.com/thunder/agentstate/pkg/agentstate"
+	"github.com/gstranger/hearsay/internal/memory"
+	"github.com/gstranger/hearsay/pkg/hearsay"
 )
 
 func TestWatcherDetectsFileChange(t *testing.T) {
@@ -19,10 +19,10 @@ func TestWatcherDetectsFileChange(t *testing.T) {
 	}
 
 	mem := memory.New()
-	if err := mem.CreateNamespace(context.Background(), agentstate.Namespace{ID: "watch-test", CreatedAt: time.Now()}); err != nil {
+	if err := mem.CreateNamespace(context.Background(), hearsay.Namespace{ID: "watch-test", CreatedAt: time.Now()}); err != nil {
 		t.Fatalf("create namespace: %v", err)
 	}
-	client := agentstate.NewClient(mem, "watch-test")
+	client := hearsay.NewClient(mem, "watch-test")
 
 	w := New(Config{
 		Path:      dir,
@@ -61,7 +61,7 @@ func TestWatcherDetectsFileChange(t *testing.T) {
 	if claims[0].AgentID != "watcher:auto" {
 		t.Fatalf("expected agent 'watcher:auto', got %s", claims[0].AgentID)
 	}
-	if claims[0].Operation != agentstate.OpWrite {
+	if claims[0].Operation != hearsay.OpWrite {
 		t.Fatalf("expected OpWrite, got %s", claims[0].Operation)
 	}
 }

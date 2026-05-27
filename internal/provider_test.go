@@ -11,23 +11,23 @@ import (
 	"testing"
 	"time"
 
-	"github.com/thunder/agentstate/internal/managed"
-	"github.com/thunder/agentstate/internal/memory"
-	"github.com/thunder/agentstate/internal/postgres"
-	"github.com/thunder/agentstate/internal/sqlite"
-	"github.com/thunder/agentstate/pkg/agentstate"
+	"github.com/gstranger/hearsay/internal/managed"
+	"github.com/gstranger/hearsay/internal/memory"
+	"github.com/gstranger/hearsay/internal/postgres"
+	"github.com/gstranger/hearsay/internal/sqlite"
+	"github.com/gstranger/hearsay/pkg/hearsay"
 )
 
 func TestManagedProvider(t *testing.T) {
 	// Inline minimal mock server for contract testing
 	var mu sync.Mutex
 	namespaces := make(map[string]struct{})
-	messages := make(map[string][]agentstate.Message)
-	tasks := make(map[string]map[string]*agentstate.A2ATask) // ns -> taskID -> task
+	messages := make(map[string][]hearsay.Message)
+	tasks := make(map[string]map[string]*hearsay.A2ATask) // ns -> taskID -> task
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("POST /namespaces/create", func(w http.ResponseWriter, r *http.Request) {
-		var ns agentstate.Namespace
+		var ns hearsay.Namespace
 		json.NewDecoder(r.Body).Decode(&ns)
 		mu.Lock()
 		namespaces[ns.ID] = struct{}{}
@@ -47,7 +47,7 @@ func TestManagedProvider(t *testing.T) {
 	mux.HandleFunc("POST /append", func(w http.ResponseWriter, r *http.Request) {
 		var req struct {
 			Namespace string               `json:"namespace"`
-			Messages  []agentstate.Message `json:"messages"`
+			Messages  []hearsay.Message `json:"messages"`
 		}
 		json.NewDecoder(r.Body).Decode(&req)
 		mu.Lock()
@@ -67,7 +67,7 @@ func TestManagedProvider(t *testing.T) {
 		mu.Lock()
 		msgs := messages[ns]
 		mu.Unlock()
-		var result []agentstate.Message
+		var result []hearsay.Message
 		for _, m := range msgs {
 			if int(m.Offset) <= since {
 				continue
@@ -82,8 +82,8 @@ func TestManagedProvider(t *testing.T) {
 		mu.Lock()
 		msgs := messages[ns]
 		mu.Unlock()
-		var active []agentstate.Claim
-		for _, c := range agentstate.FilterActiveClaims(msgs) {
+		var active []hearsay.Claim
+		for _, c := range hearsay.FilterActiveClaims(msgs) {
 			active = append(active, c)
 		}
 		w.Header().Set("Content-Type", "application/json")
@@ -101,13 +101,13 @@ func TestManagedProvider(t *testing.T) {
 			if m.AgentID == agentID && m.Timestamp.After(lastSeen) {
 				lastSeen = m.Timestamp
 			}
-			if m.Type == agentstate.MsgClaim && m.AgentID == agentID {
-				var c agentstate.Claim
+			if m.Type == hearsay.MsgClaim && m.AgentID == agentID {
+				var c hearsay.Claim
 				json.Unmarshal(m.Payload, &c)
 				active = append(active, c.ClaimID)
 			}
 		}
-		state := agentstate.AgentState{AgentID: agentID, ActiveClaims: active, LastSeen: lastSeen}
+		state := hearsay.AgentState{AgentID: agentID, ActiveClaims: active, LastSeen: lastSeen}
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(state)
 	})
@@ -119,12 +119,12 @@ func TestManagedProvider(t *testing.T) {
 	mux.HandleFunc("POST /tasks/create", func(w http.ResponseWriter, r *http.Request) {
 		var req struct {
 			Namespace string              `json:"namespace"`
-			Task      *agentstate.A2ATask `json:"task"`
+			Task      *hearsay.A2ATask `json:"task"`
 		}
 		json.NewDecoder(r.Body).Decode(&req)
 		mu.Lock()
 		if tasks[req.Namespace] == nil {
-			tasks[req.Namespace] = make(map[string]*agentstate.A2ATask)
+			tasks[req.Namespace] = make(map[string]*hearsay.A2ATask)
 		}
 		tasks[req.Namespace][req.Task.ID] = req.Task
 		mu.Unlock()
@@ -146,12 +146,12 @@ func TestManagedProvider(t *testing.T) {
 	mux.HandleFunc("POST /tasks/update", func(w http.ResponseWriter, r *http.Request) {
 		var req struct {
 			Namespace string              `json:"namespace"`
-			Task      *agentstate.A2ATask `json:"task"`
+			Task      *hearsay.A2ATask `json:"task"`
 		}
 		json.NewDecoder(r.Body).Decode(&req)
 		mu.Lock()
 		if tasks[req.Namespace] == nil {
-			tasks[req.Namespace] = make(map[string]*agentstate.A2ATask)
+			tasks[req.Namespace] = make(map[string]*hearsay.A2ATask)
 		}
 		tasks[req.Namespace][req.Task.ID] = req.Task
 		mu.Unlock()
@@ -162,39 +162,39 @@ func TestManagedProvider(t *testing.T) {
 	})
 	mux.HandleFunc("GET /tasks/history", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode([]agentstate.A2AMessage{})
+		json.NewEncoder(w).Encode([]hearsay.A2AMessage{})
 	})
 	mux.HandleFunc("POST /tasks/artifact", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	})
 	mux.HandleFunc("GET /tasks/artifacts", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode([]agentstate.A2AArtifact{})
+		json.NewEncoder(w).Encode([]hearsay.A2AArtifact{})
 	})
 
 	ts := httptest.NewServer(mux)
 	defer ts.Close()
 
 	p := managed.New(ts.URL, "")
-	RunProviderContractTests(t, "managed", func() (agentstate.Provider, error) {
+	RunProviderContractTests(t, "managed", func() (hearsay.Provider, error) {
 		return p, nil
 	})
 }
 
 func TestMemoryProvider(t *testing.T) {
-	RunProviderContractTests(t, "memory", func() (agentstate.Provider, error) {
+	RunProviderContractTests(t, "memory", func() (hearsay.Provider, error) {
 		return memory.New(), nil
 	})
 }
 
 func TestSQLiteProvider(t *testing.T) {
-	RunProviderContractTests(t, "sqlite", func() (agentstate.Provider, error) {
+	RunProviderContractTests(t, "sqlite", func() (hearsay.Provider, error) {
 		return sqlite.New(":memory:")
 	})
 }
 
 func TestPostgresProvider(t *testing.T) {
-	dsn := os.Getenv("AGENTSTATE_POSTGRES_DSN")
+	dsn := os.Getenv("HEARSAY_POSTGRES_DSN")
 	if dsn == "" {
 		dsn = "postgres://postgres:postgres@localhost:5432/postgres?sslmode=disable"
 	}
@@ -204,9 +204,9 @@ func TestPostgresProvider(t *testing.T) {
 		t.Skipf("PostgreSQL unavailable: %v", err)
 	}
 	_ = p.DeleteNamespace(ctx, "test-ns")
-	_ = p.CreateNamespace(ctx, agentstate.Namespace{ID: "test-ns", CreatedAt: time.Now()})
+	_ = p.CreateNamespace(ctx, hearsay.Namespace{ID: "test-ns", CreatedAt: time.Now()})
 
-	RunProviderContractTests(t, "postgres", func() (agentstate.Provider, error) {
+	RunProviderContractTests(t, "postgres", func() (hearsay.Provider, error) {
 		return p, nil
 	})
 }

@@ -23,11 +23,11 @@ This document is an honest assessment of what is solid enough for production use
 
 ## What Comprises the Tool Today
 
-### Core CLI (`agentstate` binary)
+### Core CLI (`hearsay` binary)
 
 | Command | Purpose |
 |---|---|
-| `init` | Creates `.agentstate.toml` config |
+| `init` | Creates `.hearsay.toml` config |
 | `claim` | Lock a resource with operation + intent |
 | `release` | Unlock a claim with outcome (`succeeded`/`abandoned`/`conflicted`) |
 | `heartbeat` | Keep a claim alive (extends TTL) |
@@ -42,7 +42,7 @@ This document is an honest assessment of what is solid enough for production use
 
 - **SQLite** (`internal/sqlite/`) — Local file, default. Pure Go (`modernc.org/sqlite`), no CGO.
 - **PostgreSQL** (`internal/postgres/`) — Shared database for teams.
-- **Managed** (`internal/managed/`) — HTTP client proxying to a remote `agentstate serve`.
+- **Managed** (`internal/managed/`) — HTTP client proxying to a remote `hearsay serve`.
 
 ### HTTP Server (`internal/server/`)
 
@@ -80,8 +80,8 @@ Agent-to-agent messaging types:
 
 ### Integrations
 
-- **Cursor IDE** (`cmd/agentstate/cursor.go`, `sdk/cursor/`) — Hooks into `sessionStart`, `preToolUse`, `postToolUse`, `sessionEnd`. Gracefully degrades (warns, never blocks) when coordination is unavailable.
-- **TypeScript SDK** (`sdk/typescript/`) — `AgentstateClient` and `createHooks()` with auto-heartbeat, auto-release, and full test coverage.
+- **Cursor IDE** (`cmd/hearsay/cursor.go`, `sdk/cursor/`) — Hooks into `sessionStart`, `preToolUse`, `postToolUse`, `sessionEnd`. Gracefully degrades (warns, never blocks) when coordination is unavailable.
+- **TypeScript SDK** (`sdk/typescript/`) — `HearsayClient` and `createHooks()` with auto-heartbeat, auto-release, and full test coverage.
 - **File watcher** (`internal/watcher/`) — `fsnotify`-based auto-claim on file changes with include/exclude patterns.
 
 ---
@@ -136,7 +136,7 @@ All tests pass (`go test ./...`). Core logic is well-structured, covered, and ha
 | Gap | Risk | Priority |
 |---|---|---|
 | **No process death detection** | If an agent crashes, its claim lives until TTL expires (up to 5 min) | 🔴 Critical |
-| **No clustering** | Multiple `agentstate serve` instances = split brain on shared state | 🔴 Critical |
+| **No clustering** | Multiple `hearsay serve` instances = split brain on shared state | 🔴 Critical |
 | **No WebSocket / push notifications** | Mailbox is polling-only (`GET /mailbox`) | 🟡 Medium |
 | **Broadcast only works single-node** | `MailboxToBroadcast` has no cross-instance propagation | 🔴 Critical |
 | **No A2A protocol support** | Can't interoperate with Google's A2A, LangChain agents, CrewAI, etc. | 🟢 Low (strategic) |
@@ -152,7 +152,7 @@ All tests pass (`go test ./...`). Core logic is well-structured, covered, and ha
 - [ ] Add request logging middleware (method, path, agent_id, latency)
 - [ ] Add a background goroutine that sweeps expired claims every 60s (implement `ReleaseExpired`)
 - [ ] Add `status` subcommand (show active claims, mailbox count, uptime)
-- [ ] Move Cursor state from `/tmp` to `~/.config/agentstate/cursor/` (or platform equivalent)
+- [ ] Move Cursor state from `/tmp` to `~/.config/hearsay/cursor/` (or platform equivalent)
 
 ### Phase 2 — "Safe for CI/CD and Small Teams" (Weeks)
 
@@ -171,7 +171,7 @@ All tests pass (`go test ./...`). Core logic is well-structured, covered, and ha
 - [ ] Add clustering / shared state backend (Redis or event log replication)
 - [ ] Add audit log table (append-only, non-deletable)
 - [ ] Add A2A protocol adapter so Thunder sessions can expose coordination as an A2A skill
-- [ ] Add federation: one `agentstate serve` can forward claims to another
+- [ ] Add federation: one `hearsay serve` can forward claims to another
 - [ ] Load testing and performance benchmarks
 
 ---
@@ -186,13 +186,13 @@ Currently, expired claims are **filtered at query time** (`ActiveClaims` checks 
 
 ### The Split-Brain Problem
 
-If two developers each run `agentstate serve` pointing at the same Postgres database, everything works. But if they run separate instances (different SQLite files or different Postgres instances), coordination is completely broken — agents can't see each other's claims. There is no federation or gossip protocol.
+If two developers each run `hearsay serve` pointing at the same Postgres database, everything works. But if they run separate instances (different SQLite files or different Postgres instances), coordination is completely broken — agents can't see each other's claims. There is no federation or gossip protocol.
 
 **Mitigation today:** Use a single shared Postgres instance. **Fix:** Add clustering (Redis pub/sub, or inter-server forwarding).
 
 ### The Silent Failure Problem
 
-The Cursor IDE integration is designed to *never block* — if agentstate is down or misconfigured, it silently `allow`s with a warning message. This is the right UX for an IDE plugin, but it means a team might think they're coordinated when they're not.
+The Cursor IDE integration is designed to *never block* — if hearsay is down or misconfigured, it silently `allow`s with a warning message. This is the right UX for an IDE plugin, but it means a team might think they're coordinated when they're not.
 
 **Mitigation today:** Watch for the `"⚠️"` warning in agent responses. **Fix:** Add a `status` command to verify connectivity.
 
@@ -201,15 +201,15 @@ The Cursor IDE integration is designed to *never block* — if agentstate is dow
 ## Test Coverage Status
 
 ```
-ok      github.com/thunder/agentstate/cmd/agentstate              0.563s
-ok      github.com/thunder/agentstate/internal                    (cached)
-ok      github.com/thunder/agentstate/internal/mailbox            2.788s
-ok      github.com/thunder/agentstate/internal/managed            (cached)
-ok      github.com/thunder/agentstate/internal/postgres           (cached)
-ok      github.com/thunder/agentstate/internal/server             1.300s
-ok      github.com/thunder/agentstate/internal/sqlite             (cached)
-ok      github.com/thunder/agentstate/internal/watcher            (cached)
-ok      github.com/thunder/agentstate/pkg/agentstate              1.039s
+ok      github.com/gstranger/hearsay/cmd/hearsay              0.563s
+ok      github.com/gstranger/hearsay/internal                    (cached)
+ok      github.com/gstranger/hearsay/internal/mailbox            2.788s
+ok      github.com/gstranger/hearsay/internal/managed            (cached)
+ok      github.com/gstranger/hearsay/internal/postgres           (cached)
+ok      github.com/gstranger/hearsay/internal/server             1.300s
+ok      github.com/gstranger/hearsay/internal/sqlite             (cached)
+ok      github.com/gstranger/hearsay/internal/watcher            (cached)
+ok      github.com/gstranger/hearsay/pkg/hearsay              1.039s
 ```
 
 All Go packages tested. TypeScript SDK also has full Vitest coverage. No integration tests for the full stack (CLI → server → provider → DB) yet.
@@ -218,4 +218,4 @@ All Go packages tested. TypeScript SDK also has full Vitest coverage. No integra
 
 ## Bottom Line
 
-**agentstate is a well-built v0 tool with a solid foundation.** The core coordination logic is correct, tested, and handles the file-collision problem it was built to solve. But it's currently a "local power tool" — not a service. Before exposing it to untrusted networks, multiple hosts, or public APIs, it needs Phase 1 and Phase 2 hardening at minimum.
+**hearsay is a well-built v0 tool with a solid foundation.** The core coordination logic is correct, tested, and handles the file-collision problem it was built to solve. But it's currently a "local power tool" — not a service. Before exposing it to untrusted networks, multiple hosts, or public APIs, it needs Phase 1 and Phase 2 hardening at minimum.

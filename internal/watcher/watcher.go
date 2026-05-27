@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/fsnotify/fsnotify"
-	"github.com/thunder/agentstate/pkg/agentstate"
+	"github.com/gstranger/hearsay/pkg/hearsay"
 )
 
 // Config configures the filesystem watcher.
@@ -20,10 +20,10 @@ type Config struct {
 	ClaimTTL     int
 	Include      []string
 	Exclude      []string
-	Client       *agentstate.Client
+	Client       *hearsay.Client
 }
 
-// Watcher detects file changes and creates retroactive claims via agentstate.
+// Watcher detects file changes and creates retroactive claims via hearsay.
 type Watcher struct {
 	cfg Config
 }
@@ -74,15 +74,15 @@ func (w *Watcher) Run(ctx context.Context) error {
 			if !ok {
 				return nil
 			}
-			// Translate fsnotify operations to agentstate operations
-			var op agentstate.Operation
+			// Translate fsnotify operations to hearsay operations
+			var op hearsay.Operation
 			switch {
 			case event.Has(fsnotify.Write) || event.Has(fsnotify.Create):
-				op = agentstate.OpWrite
+				op = hearsay.OpWrite
 			case event.Has(fsnotify.Remove):
-				op = agentstate.OpDelete
+				op = hearsay.OpDelete
 			case event.Has(fsnotify.Rename):
-				op = agentstate.OpRename
+				op = hearsay.OpRename
 			default:
 				continue
 			}
@@ -100,11 +100,11 @@ func (w *Watcher) Run(ctx context.Context) error {
 	}
 }
 
-func (w *Watcher) handleChange(ctx context.Context, path string, op agentstate.Operation) {
+func (w *Watcher) handleChange(ctx context.Context, path string, op hearsay.Operation) {
 	uri := "file://" + path
 	intent := fmt.Sprintf("auto-detected: file changed at %s", time.Now().Format(time.RFC3339))
 
-	req := agentstate.ClaimRequest{
+	req := hearsay.ClaimRequest{
 		AgentID:     "watcher:auto",
 		ResourceURI: uri,
 		Operation:   op,

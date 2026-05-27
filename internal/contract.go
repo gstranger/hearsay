@@ -7,11 +7,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/thunder/agentstate/pkg/agentstate"
+	"github.com/gstranger/hearsay/pkg/hearsay"
 )
 
 // ProviderFactory creates a fresh provider for contract testing.
-type ProviderFactory func() (agentstate.Provider, error)
+type ProviderFactory func() (hearsay.Provider, error)
 
 // RunProviderContractTests runs the standard provider contract suite.
 // Each subtest uses a unique namespace derived from the test name to avoid
@@ -41,7 +41,7 @@ func testCreateNamespace(t *testing.T, factory ProviderFactory, nsID string) {
 		t.Fatal(err)
 	}
 	_ = p.DeleteNamespace(ctx, nsID)
-	if err := p.CreateNamespace(ctx, agentstate.Namespace{ID: nsID, CreatedAt: time.Now()}); err != nil {
+	if err := p.CreateNamespace(ctx, hearsay.Namespace{ID: nsID, CreatedAt: time.Now()}); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -53,14 +53,14 @@ func testAppendAndQuery(t *testing.T, factory ProviderFactory, nsID string) {
 		t.Fatal(err)
 	}
 	_ = p.DeleteNamespace(ctx, nsID)
-	p.CreateNamespace(ctx, agentstate.Namespace{ID: nsID, CreatedAt: time.Now()})
+	p.CreateNamespace(ctx, hearsay.Namespace{ID: nsID, CreatedAt: time.Now()})
 
-	msg := agentstate.Message{Type: agentstate.MsgClaim, AgentID: "a1", Payload: []byte(`{"x":1}`)}
-	if err := p.Append(ctx, nsID, []agentstate.Message{msg}); err != nil {
+	msg := hearsay.Message{Type: hearsay.MsgClaim, AgentID: "a1", Payload: []byte(`{"x":1}`)}
+	if err := p.Append(ctx, nsID, []hearsay.Message{msg}); err != nil {
 		t.Fatal(err)
 	}
 
-	msgs, err := p.Query(ctx, nsID, agentstate.QueryOpts{})
+	msgs, err := p.Query(ctx, nsID, hearsay.QueryOpts{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -79,11 +79,11 @@ func testActiveClaims(t *testing.T, factory ProviderFactory, nsID string) {
 		t.Fatal(err)
 	}
 	_ = p.DeleteNamespace(ctx, nsID)
-	p.CreateNamespace(ctx, agentstate.Namespace{ID: nsID, CreatedAt: time.Now()})
+	p.CreateNamespace(ctx, hearsay.Namespace{ID: nsID, CreatedAt: time.Now()})
 
-	claim := agentstate.Claim{ClaimID: "c1", AgentID: "a1", ResourceURI: "file://x.ts", Operation: agentstate.OpWrite, TTLSeconds: 300, CreatedAt: time.Now()}
+	claim := hearsay.Claim{ClaimID: "c1", AgentID: "a1", ResourceURI: "file://x.ts", Operation: hearsay.OpWrite, TTLSeconds: 300, CreatedAt: time.Now()}
 	payload, _ := json.Marshal(claim)
-	p.Append(ctx, nsID, []agentstate.Message{{Type: agentstate.MsgClaim, AgentID: "a1", Payload: payload}})
+	p.Append(ctx, nsID, []hearsay.Message{{Type: hearsay.MsgClaim, AgentID: "a1", Payload: payload}})
 
 	claims, err := p.ActiveClaims(ctx, nsID, "file://x.ts")
 	if err != nil {
@@ -101,9 +101,9 @@ func testA2ATaskCRUD(t *testing.T, factory ProviderFactory, nsID string) {
 		t.Fatal(err)
 	}
 	_ = p.DeleteNamespace(ctx, nsID)
-	p.CreateNamespace(ctx, agentstate.Namespace{ID: nsID, CreatedAt: time.Now()})
+	p.CreateNamespace(ctx, hearsay.Namespace{ID: nsID, CreatedAt: time.Now()})
 
-	task := &agentstate.A2ATask{
+	task := &hearsay.A2ATask{
 		ID: "task-1", State: "submitted", StatusTime: time.Now(),
 		Namespace: nsID, CreatedAt: time.Now(),
 	}
@@ -137,14 +137,14 @@ func testRelease(t *testing.T, factory ProviderFactory, nsID string) {
 		t.Fatal(err)
 	}
 	_ = p.DeleteNamespace(ctx, nsID)
-	p.CreateNamespace(ctx, agentstate.Namespace{ID: nsID, CreatedAt: time.Now()})
+	p.CreateNamespace(ctx, hearsay.Namespace{ID: nsID, CreatedAt: time.Now()})
 
-	claim := agentstate.Claim{ClaimID: "c1", AgentID: "a1", ResourceURI: "file://x.ts", Operation: agentstate.OpWrite, TTLSeconds: 300, CreatedAt: time.Now()}
+	claim := hearsay.Claim{ClaimID: "c1", AgentID: "a1", ResourceURI: "file://x.ts", Operation: hearsay.OpWrite, TTLSeconds: 300, CreatedAt: time.Now()}
 	payload, _ := json.Marshal(claim)
-	p.Append(ctx, nsID, []agentstate.Message{{Type: agentstate.MsgClaim, AgentID: "a1", Payload: payload}})
+	p.Append(ctx, nsID, []hearsay.Message{{Type: hearsay.MsgClaim, AgentID: "a1", Payload: payload}})
 
 	relPayload, _ := json.Marshal(map[string]string{"claim_id": "c1", "outcome": "succeeded"})
-	p.Append(ctx, nsID, []agentstate.Message{{Type: agentstate.MsgRelease, Payload: relPayload}})
+	p.Append(ctx, nsID, []hearsay.Message{{Type: hearsay.MsgRelease, Payload: relPayload}})
 
 	claims, err := p.ActiveClaims(ctx, nsID, "file://x.ts")
 	if err != nil {

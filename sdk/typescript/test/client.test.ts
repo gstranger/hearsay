@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { AgentstateClient } from "../src/client.js";
+import { HearsayClient } from "../src/client.js";
 import { createServer } from "node:http";
 
 function mockServer(handler: (req: any, res: any) => void) {
@@ -11,7 +11,7 @@ function mockServer(handler: (req: any, res: any) => void) {
   });
 }
 
-describe("AgentstateClient", () => {
+describe("HearsayClient", () => {
   it("claims a resource", async () => {
     const { server, port } = await mockServer((req, res) => {
       let body = "";
@@ -25,7 +25,7 @@ describe("AgentstateClient", () => {
       });
     });
 
-    const client = new AgentstateClient({
+    const client = new HearsayClient({
       endpoint: `http://127.0.0.1:${port}`,
       namespace: "test",
       agentId: "claude:test:sess_1",
@@ -55,7 +55,7 @@ describe("AgentstateClient", () => {
       }));
     });
 
-    const client = new AgentstateClient({
+    const client = new HearsayClient({
       endpoint: `http://127.0.0.1:${port}`,
       namespace: "test",
       agentId: "claude:test:sess_1",

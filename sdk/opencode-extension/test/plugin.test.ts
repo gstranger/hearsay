@@ -27,7 +27,7 @@ const mockFetch = vi.fn();
 global.fetch = mockFetch;
 
 // Import plugin after mocks
-import plugin from "../agentstate.ts";
+import plugin from "../hearsay.ts";
 
 describe("OpenCode Extension", () => {
   const originalEnv = process.env;
@@ -58,12 +58,12 @@ describe("OpenCode Extension", () => {
 
   describe("Configuration", () => {
     it("uses default config when no env vars set", async () => {
-      delete process.env.AGENTSTATE_ENDPOINT;
-      delete process.env.AGENTSTATE_NAMESPACE;
-      delete process.env.AGENTSTATE_AGENT_ID;
-      delete process.env.AGENTSTATE_TTL;
-      delete process.env.AGENTSTATE_CLAIM_ON_READ;
-      delete process.env.AGENTSTATE_ON_CONFLICT;
+      delete process.env.HEARSAY_ENDPOINT;
+      delete process.env.HEARSAY_NAMESPACE;
+      delete process.env.HEARSAY_AGENT_ID;
+      delete process.env.HEARSAY_TTL;
+      delete process.env.HEARSAY_CLAIM_ON_READ;
+      delete process.env.HEARSAY_ON_CONFLICT;
 
       const hooks = await plugin();
       expect(hooks).toBeDefined();
@@ -71,19 +71,19 @@ describe("OpenCode Extension", () => {
     });
 
     it("reads all env vars correctly", async () => {
-      process.env.AGENTSTATE_ENDPOINT = "http://custom:9090";
-      process.env.AGENTSTATE_NAMESPACE = "test-ns";
-      process.env.AGENTSTATE_AGENT_ID = "test-agent";
-      process.env.AGENTSTATE_TTL = "600";
-      process.env.AGENTSTATE_CLAIM_ON_READ = "true";
-      process.env.AGENTSTATE_ON_CONFLICT = "allow";
+      process.env.HEARSAY_ENDPOINT = "http://custom:9090";
+      process.env.HEARSAY_NAMESPACE = "test-ns";
+      process.env.HEARSAY_AGENT_ID = "test-agent";
+      process.env.HEARSAY_TTL = "600";
+      process.env.HEARSAY_CLAIM_ON_READ = "true";
+      process.env.HEARSAY_ON_CONFLICT = "allow";
 
       const hooks = await plugin();
       expect(hooks).toBeDefined();
     });
 
     it("defaults onConflict to block for invalid values", async () => {
-      process.env.AGENTSTATE_ON_CONFLICT = "invalid";
+      process.env.HEARSAY_ON_CONFLICT = "invalid";
       const hooks = await plugin();
       expect(hooks).toBeDefined();
     });
@@ -164,7 +164,7 @@ describe("OpenCode Extension", () => {
     });
 
     it("skips read tool when claimOnRead is false", async () => {
-      process.env.AGENTSTATE_CLAIM_ON_READ = "false";
+      process.env.HEARSAY_CLAIM_ON_READ = "false";
       const hooks = await plugin();
       const before = hooks["tool.execute.before"] as Function;
 
@@ -180,7 +180,7 @@ describe("OpenCode Extension", () => {
     });
 
     it("claims on read when claimOnRead is true", async () => {
-      process.env.AGENTSTATE_CLAIM_ON_READ = "true";
+      process.env.HEARSAY_CLAIM_ON_READ = "true";
       const hooks = await plugin();
       const before = hooks["tool.execute.before"] as Function;
 
@@ -196,7 +196,7 @@ describe("OpenCode Extension", () => {
     });
 
     it("blocks on conflict in block mode", async () => {
-      process.env.AGENTSTATE_ON_CONFLICT = "block";
+      process.env.HEARSAY_ON_CONFLICT = "block";
       mockFetch.mockResolvedValue({
         ok: true,
         json: async () => ({
@@ -226,7 +226,7 @@ describe("OpenCode Extension", () => {
     });
 
     it("allows on conflict in allow mode", async () => {
-      process.env.AGENTSTATE_ON_CONFLICT = "allow";
+      process.env.HEARSAY_ON_CONFLICT = "allow";
       mockFetch.mockResolvedValue({
         ok: true,
         json: async () => ({
@@ -256,7 +256,7 @@ describe("OpenCode Extension", () => {
     });
 
     it("stores warning on conflict in warn mode", async () => {
-      process.env.AGENTSTATE_ON_CONFLICT = "warn";
+      process.env.HEARSAY_ON_CONFLICT = "warn";
       mockFetch.mockResolvedValue({
         ok: true,
         json: async () => ({
@@ -286,7 +286,7 @@ describe("OpenCode Extension", () => {
       // We verify this by checking the after hook behavior
     });
 
-    it("gracefully degrades when agentstate is unreachable", async () => {
+    it("gracefully degrades when hearsay is unreachable", async () => {
       mockFetch.mockRejectedValue(new Error("Connection refused"));
 
       const hooks = await plugin();
@@ -335,7 +335,7 @@ describe("OpenCode Extension", () => {
     });
 
     it("prepends warning to result in warn mode (experimental)", async () => {
-      process.env.AGENTSTATE_ON_CONFLICT = "warn";
+      process.env.HEARSAY_ON_CONFLICT = "warn";
       mockFetch.mockResolvedValue({
         ok: true,
         json: async () => ({
@@ -374,7 +374,7 @@ describe("OpenCode Extension", () => {
     });
 
     it("handles missing output gracefully", async () => {
-      process.env.AGENTSTATE_ON_CONFLICT = "warn";
+      process.env.HEARSAY_ON_CONFLICT = "warn";
       mockFetch.mockResolvedValue({
         ok: true,
         json: async () => ({
@@ -457,7 +457,7 @@ describe("OpenCode Extension", () => {
 
   describe("URI generation", () => {
     it("generates file:// URI for read/write/edit", async () => {
-      process.env.AGENTSTATE_CLAIM_ON_READ = "true";
+      process.env.HEARSAY_CLAIM_ON_READ = "true";
       const hooks = await plugin();
       const before = hooks["tool.execute.before"] as Function;
 

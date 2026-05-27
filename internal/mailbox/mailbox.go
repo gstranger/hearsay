@@ -6,19 +6,19 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/thunder/agentstate/pkg/agentstate"
+	"github.com/gstranger/hearsay/pkg/hearsay"
 )
 
 type Service struct {
-	provider agentstate.Provider
+	provider hearsay.Provider
 }
 
-func New(provider agentstate.Provider) *Service {
+func New(provider hearsay.Provider) *Service {
 	return &Service{provider: provider}
 }
 
 func (s *Service) Send(ctx context.Context, namespace string, from, to, msgType, content string, relatedClaimID string, ttlSeconds int) (string, error) {
-	if !agentstate.IsValidMailboxType(agentstate.MailboxType(msgType)) {
+	if !hearsay.IsValidMailboxType(hearsay.MailboxType(msgType)) {
 		return "", fmt.Errorf("invalid message type: %s", msgType)
 	}
 	if content == "" {
@@ -34,11 +34,11 @@ func (s *Service) Send(ctx context.Context, namespace string, from, to, msgType,
 		ttlSeconds = 300
 	}
 
-	msg := agentstate.MailboxMessage{
+	msg := hearsay.MailboxMessage{
 		MessageID:      uuid.New().String(),
 		From:           from,
 		To:             to,
-		Type:           agentstate.MailboxType(msgType),
+		Type:           hearsay.MailboxType(msgType),
 		Content:        content,
 		RelatedClaimID: relatedClaimID,
 		Read:           false,
@@ -53,7 +53,7 @@ func (s *Service) Send(ctx context.Context, namespace string, from, to, msgType,
 	return msg.MessageID, nil
 }
 
-func (s *Service) GetMailbox(ctx context.Context, namespace, agentID string, opts agentstate.MailboxQueryOpts) ([]agentstate.MailboxMessage, error) {
+func (s *Service) GetMailbox(ctx context.Context, namespace, agentID string, opts hearsay.MailboxQueryOpts) ([]hearsay.MailboxMessage, error) {
 	return s.provider.GetMailbox(ctx, namespace, agentID, opts)
 }
 

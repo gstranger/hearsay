@@ -3,7 +3,7 @@ package a2a
 import (
 	"encoding/json"
 
-	"github.com/thunder/agentstate/pkg/agentstate"
+	"github.com/gstranger/hearsay/pkg/hearsay"
 )
 
 type AgentCard struct {
@@ -47,9 +47,9 @@ type Skill struct {
 	Parameters  json.RawMessage `json:"parameters,omitempty"`
 }
 
-func GenerateAgentCard(cfg *agentstate.A2AConfig, version string) *AgentCard {
+func GenerateAgentCard(cfg *hearsay.A2AConfig, version string) *AgentCard {
 	card := &AgentCard{
-		Name:             "agentstate-coordinator",
+		Name:             "hearsay-coordinator",
 		Description:      "Resource locking, conflict detection, and mailbox for agent teams",
 		URL:              "http://" + cfg.Addr + "/a2a",
 		Version:          version,

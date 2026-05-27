@@ -1,13 +1,13 @@
-# Agentstate Integration Guide
+# Hearsay Integration Guide
 
-**Agentstate connects to your agent harness in one of three ways.** The key question is: **does your harness run TypeScript/JS or not?**
+**Hearsay connects to your agent harness in one of three ways.** The key question is: **does your harness run TypeScript/JS or not?**
 
 ```
 ┌──────────────────────────────────────────────────────────────┐
 │  TypeScript/JavaScript Harnesses                              │
 │  Claude Code / Codex / pi                                     │
 │  ↓ HTTP fetch()                                               │
-│  Needs agentstate serve running (pi auto-starts it)          │
+│  Needs hearsay serve running (pi auto-starts it)          │
 ├──────────────────────────────────────────────────────────────┤
 │  Go/CLI Harnesses                                             │
 │  Cursor / Manual CLI / Watcher                                │
@@ -20,30 +20,30 @@
 
 ## Why Some Need a Server and Some Don't
 
-The `agentstate` binary is written in Go. It contains the claims protocol, provider interface, SQLite/PostgreSQL storage, and all the coordination logic.
+The `hearsay` binary is written in Go. It contains the claims protocol, provider interface, SQLite/PostgreSQL storage, and all the coordination logic.
 
-**TypeScript can't import Go.** There's no way for `@agentstate/sdk` or the pi extension to open a SQLite file directly from Node.js. So we run `agentstate serve`, which exposes an HTTP API. TypeScript calls `POST /claim`, `GET /claims`, etc., and the Go binary handles storage.
+**TypeScript can't import Go.** There's no way for `@hearsay/sdk` or the pi extension to open a SQLite file directly from Node.js. So we run `hearsay serve`, which exposes an HTTP API. TypeScript calls `POST /claim`, `GET /claims`, etc., and the Go binary handles storage.
 
-**Go binaries don't need a server.** `agentstate claim`, `agentstate cursor`, `agentstate watch` are all Go commands. They open SQLite directly via the same Go library that the server uses.
+**Go binaries don't need a server.** `hearsay claim`, `hearsay cursor`, `hearsay watch` are all Go commands. They open SQLite directly via the same Go library that the server uses.
 
 | Harness | Language | Mechanism | Needs `serve`? | Auto-start? |
 |---------|----------|-----------|---------------|-------------|
-| **Claude Code** | TypeScript | `@agentstate/sdk` via HTTP | Yes | No — start manually |
-| **Codex** | TypeScript | `@agentstate/sdk` via HTTP | Yes | No — start manually |
+| **Claude Code** | TypeScript | `@hearsay/sdk` via HTTP | Yes | No — start manually |
+| **Codex** | TypeScript | `@hearsay/sdk` via HTTP | Yes | No — start manually |
 | **pi** | TypeScript | Extension API via HTTP | Yes | **Yes — auto-starts** |
 | **OpenCode** | TypeScript | `tool.execute.before` hook | Yes | **Yes — auto-starts** |
-| **Cursor** | Shell/Go | CLI `agentstate cursor` | No | N/A |
-| **CLI** | Go | `agentstate claim/query` | No | N/A |
-| **Watcher** | Go | `agentstate watch` | No | N/A |
+| **Cursor** | Shell/Go | CLI `hearsay cursor` | No | N/A |
+| **CLI** | Go | `hearsay claim/query` | No | N/A |
+| **Watcher** | Go | `hearsay watch` | No | N/A |
 
 ---
 
 ## Claude Code / Codex
 
-Claude Code and Codex support `PreToolUse` and `PostToolUse` hooks. The agent calls its normal tools; `@agentstate/sdk` intercepts transparently.
+Claude Code and Codex support `PreToolUse` and `PostToolUse` hooks. The agent calls its normal tools; `@hearsay/sdk` intercepts transparently.
 
 ```typescript
-import { createHooks } from "@agentstate/sdk";
+import { createHooks } from "@hearsay/sdk";
 
 const hooks = createHooks({
   endpoint: "http://localhost:8080",
@@ -67,10 +67,10 @@ for await (const message of query({
 ```
 
 **Setup:**
-1. Install the Go binary: `go install github.com/thunder/agentstate/cmd/agentstate@latest`
-2. In your project directory: `agentstate init --provider sqlite --namespace org/repo/branch`
-3. **Start the server in another terminal:** `agentstate serve`
-4. `npm install @agentstate/sdk` and wire the hooks into your Claude Code harness
+1. Install the Go binary: `go install github.com/thunder/hearsay/cmd/hearsay@latest`
+2. In your project directory: `hearsay init --provider sqlite --namespace org/repo/branch`
+3. **Start the server in another terminal:** `hearsay serve`
+4. `npm install @hearsay/sdk` and wire the hooks into your Claude Code harness
 
 **What the agent sees:** Its normal `Read`, `Write`, `Edit`, `Bash` calls. On conflict, the hook returns `permissionDecision: "deny"` with a message like `Conflict: agent-7 is writing file://src/auth.ts`.
 
@@ -82,25 +82,25 @@ for await (const message of query({
 
 pi has a native extension API: `pi.on("tool_call")` blocks tool execution and `pi.on("tool_result")` releases claims.
 
-**Key difference from Claude Code:** The pi extension **auto-starts `agentstate serve`** in the background. You don't need a separate terminal.
+**Key difference from Claude Code:** The pi extension **auto-starts `hearsay serve`** in the background. You don't need a separate terminal.
 
 ```typescript
-// .pi/extensions/agentstate.ts
+// .pi/extensions/hearsay.ts
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 // ... extension code auto-starts serve if not running ...
 ```
 
 **Setup:**
-1. Install the Go binary: `go install github.com/thunder/agentstate/cmd/agentstate@latest`
-2. Copy `sdk/pi-extension/agentstate.ts` to `.pi/extensions/agentstate.ts`
+1. Install the Go binary: `go install github.com/thunder/hearsay/cmd/hearsay@latest`
+2. Copy `sdk/pi-extension/hearsay.ts` to `.pi/extensions/hearsay.ts`
 3. Set environment variables (optional — defaults work):
    ```bash
-   export AGENTSTATE_ENDPOINT=http://localhost:8080
-   export AGENTSTATE_NAMESPACE=org/repo/branch
+   export HEARSAY_ENDPOINT=http://localhost:8080
+   export HEARSAY_NAMESPACE=org/repo/branch
    ```
 4. Start pi. The extension will:
    - Check if `localhost:8080` is running
-   - If not: run `agentstate init` (if needed) → `agentstate serve &` in background
+   - If not: run `hearsay init` (if needed) → `hearsay serve &` in background
    - Then proceed with coordination
 
 **What the agent sees:** On conflict, pi shows a "blocked" message with the conflicting agent's intent. The agent never sees the tool output for blocked calls.
@@ -112,17 +112,17 @@ import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 OpenCode supports `tool.execute.before` hooks via plugins. Unlike pi, the hook API only supports **blocking** (throwing an error) — there's no native "warn but allow" return value.
 
 **Setup:**
-1. Install the Go binary: `go install github.com/thunder/agentstate/cmd/agentstate@latest`
-2. Copy `sdk/opencode-extension/agentstate.ts` to `.opencode/plugins/agentstate.ts`
+1. Install the Go binary: `go install github.com/thunder/hearsay/cmd/hearsay@latest`
+2. Copy `sdk/opencode-extension/hearsay.ts` to `.opencode/plugins/hearsay.ts`
 3. Set environment variables (optional — defaults work):
    ```bash
-   export AGENTSTATE_ENDPOINT=http://localhost:8080
-   export AGENTSTATE_NAMESPACE=org/repo/branch
-   export AGENTSTATE_ON_CONFLICT=block  # block | allow (warn is experimental)
+   export HEARSAY_ENDPOINT=http://localhost:8080
+   export HEARSAY_NAMESPACE=org/repo/branch
+   export HEARSAY_ON_CONFLICT=block  # block | allow (warn is experimental)
    ```
 4. Start OpenCode. The plugin will:
    - Check if `localhost:8080` is running
-   - If not: auto-start `agentstate serve`
+   - If not: auto-start `hearsay serve`
    - Then intercept tool execution
 
 **What the agent sees:** On conflict in `block` mode, the tool fails and the agent sees the error message: `Conflict: agent-X is write file://src/auth.ts (refactoring token validation)`.
@@ -144,8 +144,8 @@ OpenCode supports `tool.execute.before` hooks via plugins. Unlike pi, the hook A
 Cursor supports a `hooks.json` file that runs shell commands before/after tool use. Coordination is done via the Go CLI directly — no HTTP server.
 
 **Setup:**
-1. Install the Go binary: `go install github.com/thunder/agentstate/cmd/agentstate@latest`
-2. `agentstate init` in your project directory
+1. Install the Go binary: `go install github.com/thunder/hearsay/cmd/hearsay@latest`
+2. `hearsay init` in your project directory
 3. Copy `sdk/cursor/hooks.json` to `.cursor/hooks.json`
 4. **No `serve` needed.** Cursor subcommands open SQLite directly.
 
@@ -153,10 +153,10 @@ Cursor supports a `hooks.json` file that runs shell commands before/after tool u
 {
   "version": 1,
   "hooks": {
-    "sessionStart": [{ "command": "agentstate cursor session-start --session-id {{sessionId}} ...", "timeout": 5 }],
-    "preToolUse": [{ "command": "agentstate cursor pre-tool-use --session-id {{sessionId}} --tool {{toolName}} ...", "timeout": 5, "matcher": "Read|Write|Edit|Bash" }],
-    "postToolUse": [{ "command": "agentstate cursor post-tool-use --session-id {{sessionId}} --tool {{toolName}} ...", "timeout": 5, "matcher": "Read|Write|Edit|Bash" }],
-    "sessionEnd": [{ "command": "agentstate cursor session-end --session-id {{sessionId}}", "timeout": 5 }]
+    "sessionStart": [{ "command": "hearsay cursor session-start --session-id {{sessionId}} ...", "timeout": 5 }],
+    "preToolUse": [{ "command": "hearsay cursor pre-tool-use --session-id {{sessionId}} --tool {{toolName}} ...", "timeout": 5, "matcher": "Read|Write|Edit|Bash" }],
+    "postToolUse": [{ "command": "hearsay cursor post-tool-use --session-id {{sessionId}} --tool {{toolName}} ...", "timeout": 5, "matcher": "Read|Write|Edit|Bash" }],
+    "sessionEnd": [{ "command": "hearsay cursor session-end --session-id {{sessionId}}", "timeout": 5 }]
   }
 }
 ```
@@ -173,17 +173,17 @@ Any harness can use the CLI directly:
 
 ```bash
 # Before editing
-agentstate claim file://src/auth.ts --operation write --intent "refactoring token validation"
+hearsay claim file://src/auth.ts --operation write --intent "refactoring token validation"
 
 # Check before planning
-agentstate check file://src/auth.ts --operation write
+hearsay check file://src/auth.ts --operation write
 # → {"has_conflict":true,"conflicts":[...]}
 
 # After editing
-agentstate release <claim-id> --outcome succeeded
+hearsay release <claim-id> --outcome succeeded
 ```
 
-The CLI reads `.agentstate.toml` and opens SQLite/PostgreSQL directly.
+The CLI reads `.hearsay.toml` and opens SQLite/PostgreSQL directly.
 
 ---
 
@@ -192,22 +192,22 @@ The CLI reads `.agentstate.toml` and opens SQLite/PostgreSQL directly.
 If your harness has no hook system:
 
 ```bash
-agentstate watch --path ./src --namespace org/repo/branch --claim-ttl 60
+hearsay watch --path ./src --namespace org/repo/branch --claim-ttl 60
 ```
 
-This detects file changes and creates retroactive claims. Other agents see them via `agentstate query`.
+This detects file changes and creates retroactive claims. Other agents see them via `hearsay query`.
 
 ---
 
-## Adding Agentstate to a New Harness
+## Adding Hearsay to a New Harness
 
 | What your harness supports | Effort | See reference |
 |-----------|--------|---------------|
 | Pre/post tool callbacks (TypeScript) | ~80 lines | `sdk/typescript/src/hooks.ts` |
-| Tool interception/blocking (TypeScript) | ~100 lines | `sdk/pi-extension/agentstate.ts` |
-| `tool.execute.before` hook (TypeScript) | ~120 lines | `sdk/opencode-extension/agentstate.ts` |
-| Shell commands around tool calls | ~150 lines | `cmd/agentstate/cursor.go` |
-| No hooks | Zero code | `agentstate watch` or manual CLI |
+| Tool interception/blocking (TypeScript) | ~100 lines | `sdk/pi-extension/hearsay.ts` |
+| `tool.execute.before` hook (TypeScript) | ~120 lines | `sdk/opencode-extension/hearsay.ts` |
+| Shell commands around tool calls | ~150 lines | `cmd/hearsay/cursor.go` |
+| No hooks | Zero code | `hearsay watch` or manual CLI |
 
 ---
 
@@ -215,23 +215,23 @@ This detects file changes and creates retroactive claims. Other agents see them 
 
 ### Start serve (TypeScript harnesses)
 ```bash
-agentstate init --provider sqlite --namespace org/repo/branch
-agentstate serve --addr localhost:8080
+hearsay init --provider sqlite --namespace org/repo/branch
+hearsay serve --addr localhost:8080
 ```
 
 ### Config (all harnesses)
 ```toml
-# .agentstate.toml
+# .hearsay.toml
 version = 1
 namespace = "org/repo/branch"
 provider = "sqlite"
 
 [provider_config.sqlite]
-path = ".agentstate.db"
+path = ".hearsay.db"
 ```
 
 ### Which binary do I install?
-One binary: `go install github.com/thunder/agentstate/cmd/agentstate@latest`
+One binary: `go install github.com/thunder/hearsay/cmd/hearsay@latest`
 
 It does everything: claims, queries, serves, watches, cursor hooks.
 
@@ -257,36 +257,36 @@ const hooks = createHooks({
 
 ### pi
 ```bash
-export AGENTSTATE_ON_CONFLICT=warn  # block | warn | allow
+export HEARSAY_ON_CONFLICT=warn  # block | warn | allow
 ```
 
 ### Cursor
 ```bash
 # In hooks.json:
-"command": "agentstate cursor pre-tool-use ... --on-conflict warn"
+"command": "hearsay cursor pre-tool-use ... --on-conflict warn"
 
 # Or via environment:
-export AGENTSTATE_ON_CONFLICT=warn
+export HEARSAY_ON_CONFLICT=warn
 ```
 
 ### OpenCode
 OpenCode's hook API only supports blocking via `throw`. The `warn` mode attempts to prepend a warning to the tool result, but this is **experimental** and may not reach the agent. Default is `block`.
 
 ```bash
-export AGENTSTATE_ON_CONFLICT=block  # block | allow (warn is experimental)
+export HEARSAY_ON_CONFLICT=block  # block | allow (warn is experimental)
 ```
 
 ### Manual CLI & Watcher
 Conflict modes only apply to integrations that intercept tool execution. The manual CLI and filesystem watcher report conflicts but do not block or warn automatically.
 
-- **Manual CLI:** `agentstate check` returns conflict details as JSON; your script decides whether to proceed.
-- **Watcher:** Creates retroactive claims after file changes are detected. Other agents see these via `agentstate query`.
+- **Manual CLI:** `hearsay check` returns conflict details as JSON; your script decides whether to proceed.
+- **Watcher:** Creates retroactive claims after file changes are detected. Other agents see these via `hearsay query`.
 
 ---
 
 ## Mailbox Auto-Check
 
-Agentstate's mailbox lets agents send messages to each other. **Critical messages are checked automatically** by supported harnesses before every tool execution.
+Hearsay's mailbox lets agents send messages to each other. **Critical messages are checked automatically** by supported harnesses before every tool execution.
 
 ### What gets checked automatically
 
@@ -307,7 +307,7 @@ Agentstate's mailbox lets agents send messages to each other. **Critical message
 | **pi** | ✅ | `tool_call` event checks mailbox, blocks on critical messages |
 | **OpenCode** | ✅ | `tool.execute.before` checks mailbox, throws on critical messages |
 | **Cursor** | ❌ | No hook API for mailbox queries; check manually via skill |
-| **Manual CLI** | ❌ | No auto-check; use `agentstate query` manually |
+| **Manual CLI** | ❌ | No auto-check; use `hearsay query` manually |
 
 ### What the agent sees
 

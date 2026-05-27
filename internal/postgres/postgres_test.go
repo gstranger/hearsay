@@ -7,12 +7,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/thunder/agentstate/internal"
-	"github.com/thunder/agentstate/pkg/agentstate"
+	"github.com/gstranger/hearsay/internal"
+	"github.com/gstranger/hearsay/pkg/hearsay"
 )
 
 func TestPostgresProviderContract(t *testing.T) {
-	dsn := os.Getenv("AGENTSTATE_POSTGRES_DSN")
+	dsn := os.Getenv("HEARSAY_POSTGRES_DSN")
 	if dsn == "" {
 		dsn = "postgres://postgres:postgres@localhost:5432/postgres?sslmode=disable"
 	}
@@ -22,15 +22,15 @@ func TestPostgresProviderContract(t *testing.T) {
 		t.Skipf("PostgreSQL not available: %v", err)
 	}
 	_ = p.DeleteNamespace(ctx, "test-ns")
-	_ = p.CreateNamespace(ctx, agentstate.Namespace{ID: "test-ns", CreatedAt: time.Now()})
+	_ = p.CreateNamespace(ctx, hearsay.Namespace{ID: "test-ns", CreatedAt: time.Now()})
 
-	internal.RunProviderContractTests(t, "postgres", func() (agentstate.Provider, error) {
+	internal.RunProviderContractTests(t, "postgres", func() (hearsay.Provider, error) {
 		return p, nil
 	})
 }
 
 func TestPostgresProviderNamespaceIsolation(t *testing.T) {
-	dsn := os.Getenv("AGENTSTATE_POSTGRES_DSN")
+	dsn := os.Getenv("HEARSAY_POSTGRES_DSN")
 	if dsn == "" {
 		dsn = "postgres://postgres:postgres@localhost:5432/postgres?sslmode=disable"
 	}
@@ -42,12 +42,12 @@ func TestPostgresProviderNamespaceIsolation(t *testing.T) {
 
 	_ = p.DeleteNamespace(ctx, "ns-a")
 	_ = p.DeleteNamespace(ctx, "ns-b")
-	_ = p.CreateNamespace(ctx, agentstate.Namespace{ID: "ns-a", CreatedAt: time.Now()})
-	_ = p.CreateNamespace(ctx, agentstate.Namespace{ID: "ns-b", CreatedAt: time.Now()})
+	_ = p.CreateNamespace(ctx, hearsay.Namespace{ID: "ns-a", CreatedAt: time.Now()})
+	_ = p.CreateNamespace(ctx, hearsay.Namespace{ID: "ns-b", CreatedAt: time.Now()})
 
-	claim := agentstate.Claim{ClaimID: "c1", AgentID: "a1", ResourceURI: "file://x.ts", Operation: agentstate.OpWrite, TTLSeconds: 300, CreatedAt: time.Now()}
+	claim := hearsay.Claim{ClaimID: "c1", AgentID: "a1", ResourceURI: "file://x.ts", Operation: hearsay.OpWrite, TTLSeconds: 300, CreatedAt: time.Now()}
 	payload, _ := json.Marshal(claim)
-	if err := p.Append(ctx, "ns-a", []agentstate.Message{{Type: agentstate.MsgClaim, AgentID: "a1", Payload: payload}}); err != nil {
+	if err := p.Append(ctx, "ns-a", []hearsay.Message{{Type: hearsay.MsgClaim, AgentID: "a1", Payload: payload}}); err != nil {
 		t.Fatalf("append failed: %v", err)
 	}
 

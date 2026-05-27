@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 
-	"github.com/thunder/agentstate/pkg/agentstate"
+	"github.com/gstranger/hearsay/pkg/hearsay"
 )
 
 type taskParams struct {
@@ -32,7 +32,7 @@ func (s *Server) handleTasksSend(ctx context.Context, params json.RawMessage) (*
 
 	// Append user message to history
 	msgJSON, _ := json.Marshal(req.Message)
-	if err := s.provider.AppendTaskHistory(ctx, s.namespace, task.ID, 0, agentstate.A2AMessage{
+	if err := s.provider.AppendTaskHistory(ctx, s.namespace, task.ID, 0, hearsay.A2AMessage{
 		Role:  "user",
 		Parts: msgJSON,
 	}); err != nil {
@@ -63,7 +63,7 @@ func (s *Server) handleTasksSend(ctx context.Context, params json.RawMessage) (*
 		if err != nil {
 			return nil, NewError(-32003, "Failed to marshal artifact: "+err.Error())
 		}
-		if err := s.provider.CreateArtifact(ctx, s.namespace, task.ID, agentstate.A2AArtifact{
+		if err := s.provider.CreateArtifact(ctx, s.namespace, task.ID, hearsay.A2AArtifact{
 			Name: art.Name, Description: art.Description, Parts: partsJSON,
 			Index: art.Index, Append: art.Append, LastChunk: art.LastChunk,
 		}); err != nil {
@@ -131,7 +131,7 @@ func (s *Server) handleTasksCancel(ctx context.Context, params json.RawMessage) 
 
 	task := storageToTask(st)
 	if task.ClaimID != "" {
-		if err := s.client.Release(ctx, task.ClaimID, agentstate.OutcomeAbandoned); err != nil {
+		if err := s.client.Release(ctx, task.ClaimID, hearsay.OutcomeAbandoned); err != nil {
 			// Log warning but proceed with cancel — release failure shouldn't prevent cancel
 			_ = err
 		}

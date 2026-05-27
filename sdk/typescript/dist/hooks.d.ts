@@ -1,4 +1,4 @@
-import { AgentstateClient, type ClientOptions } from "./client.js";
+import { HearsayClient, type ClientOptions } from "./client.js";
 import type { ConflictMode } from "./types.js";
 export interface HookOptions extends ClientOptions {
     autoHeartbeat?: boolean;
@@ -10,7 +10,7 @@ export interface PreToolUseResult {
     agentMessage?: string;
 }
 export declare function createHooks(opts: HookOptions): {
-    client: AgentstateClient;
+    client: HearsayClient;
     preToolUse(toolName: string, input: Record<string, unknown>): Promise<PreToolUseResult>;
     postToolUse(toolName: string, input: Record<string, unknown>, _result: unknown): Promise<void>;
     sessionStart(): Promise<void>;

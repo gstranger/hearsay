@@ -6,15 +6,15 @@ import (
 	"testing"
 	"time"
 
-	"github.com/thunder/agentstate/internal/memory"
-	"github.com/thunder/agentstate/pkg/agentstate"
+	"github.com/gstranger/hearsay/internal/memory"
+	"github.com/gstranger/hearsay/pkg/hearsay"
 )
 
 func TestHandleTasksSendClaimResource(t *testing.T) {
 	p := memory.New()
-	_ = p.CreateNamespace(context.Background(), agentstate.Namespace{ID: "test", CreatedAt: time.Now()})
-	client := agentstate.NewClient(p, "test")
-	cfg := &agentstate.A2AConfig{Addr: "localhost:8081"}
+	_ = p.CreateNamespace(context.Background(), hearsay.Namespace{ID: "test", CreatedAt: time.Now()})
+	client := hearsay.NewClient(p, "test")
+	cfg := &hearsay.A2AConfig{Addr: "localhost:8081"}
 	mw := &AuthMiddleware{}
 	srv := NewServer(cfg, client, p, mw, "test")
 
@@ -50,9 +50,9 @@ func TestHandleTasksSendClaimResource(t *testing.T) {
 
 func TestHandleTasksGet(t *testing.T) {
 	p := memory.New()
-	_ = p.CreateNamespace(context.Background(), agentstate.Namespace{ID: "test", CreatedAt: time.Now()})
-	client := agentstate.NewClient(p, "test")
-	cfg := &agentstate.A2AConfig{Addr: "localhost:8081"}
+	_ = p.CreateNamespace(context.Background(), hearsay.Namespace{ID: "test", CreatedAt: time.Now()})
+	client := hearsay.NewClient(p, "test")
+	cfg := &hearsay.A2AConfig{Addr: "localhost:8081"}
 	mw := &AuthMiddleware{}
 	srv := NewServer(cfg, client, p, mw, "test")
 

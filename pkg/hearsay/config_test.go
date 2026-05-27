@@ -1,22 +1,22 @@
-package agentstate_test
+package hearsay_test
 
 import (
 	"os"
 	"path/filepath"
 	"testing"
 
-	"github.com/thunder/agentstate/pkg/agentstate"
+	"github.com/gstranger/hearsay/pkg/hearsay"
 )
 
 func TestLoadConfig(t *testing.T) {
 	dir := t.TempDir()
-	path := filepath.Join(dir, ".agentstate.toml")
+	path := filepath.Join(dir, ".hearsay.toml")
 	content := `version = 1
 namespace = "org/repo/branch"
 provider = "sqlite"
 
 [provider_config.sqlite]
-path = ".agentstate.db"
+path = ".hearsay.db"
 
 [defaults]
 ttl_seconds = 300
@@ -27,7 +27,7 @@ auto_heartbeat = true
 		t.Fatal(err)
 	}
 
-	cfg, err := agentstate.LoadConfig(path)
+	cfg, err := hearsay.LoadConfig(path)
 	if err != nil {
 		t.Fatalf("load failed: %v", err)
 	}
@@ -37,7 +37,7 @@ auto_heartbeat = true
 	if cfg.Provider != "sqlite" {
 		t.Fatalf("provider mismatch: got %q", cfg.Provider)
 	}
-	if cfg.ProviderCfg.SQLite == nil || cfg.ProviderCfg.SQLite.Path != ".agentstate.db" {
+	if cfg.ProviderCfg.SQLite == nil || cfg.ProviderCfg.SQLite.Path != ".hearsay.db" {
 		t.Fatalf("sqlite config missing or wrong path")
 	}
 	if cfg.Defaults.TTLSeconds != 300 {
@@ -47,21 +47,21 @@ auto_heartbeat = true
 
 func TestSaveConfig(t *testing.T) {
 	dir := t.TempDir()
-	path := filepath.Join(dir, ".agentstate.toml")
-	cfg := &agentstate.Config{
+	path := filepath.Join(dir, ".hearsay.toml")
+	cfg := &hearsay.Config{
 		Version:   1,
 		Namespace: "test",
 		Provider:  "sqlite",
-		ProviderCfg: agentstate.ProviderConfig{
-			SQLite: &agentstate.SQLiteConfig{Path: "test.db"},
+		ProviderCfg: hearsay.ProviderConfig{
+			SQLite: &hearsay.SQLiteConfig{Path: "test.db"},
 		},
-		Defaults: agentstate.DefaultsConfig{TTLSeconds: 60},
+		Defaults: hearsay.DefaultsConfig{TTLSeconds: 60},
 	}
 	if err := cfg.Save(path); err != nil {
 		t.Fatal(err)
 	}
 
-	loaded, err := agentstate.LoadConfig(path)
+	loaded, err := hearsay.LoadConfig(path)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -72,13 +72,13 @@ func TestSaveConfig(t *testing.T) {
 
 func TestLoadConfigA2A(t *testing.T) {
 	dir := t.TempDir()
-	path := filepath.Join(dir, ".agentstate.toml")
+	path := filepath.Join(dir, ".hearsay.toml")
 	content := `version = 1
 namespace = "org/repo/branch"
 provider = "sqlite"
 
 [provider_config.sqlite]
-path = ".agentstate.db"
+path = ".hearsay.db"
 
 [defaults]
 ttl_seconds = 300
@@ -94,7 +94,7 @@ bearer_jwks_url = "https://auth.example.com/jwks.json"
 		t.Fatal(err)
 	}
 
-	cfg, err := agentstate.LoadConfig(path)
+	cfg, err := hearsay.LoadConfig(path)
 	if err != nil {
 		t.Fatalf("load failed: %v", err)
 	}

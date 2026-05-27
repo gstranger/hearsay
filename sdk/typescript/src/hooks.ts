@@ -1,4 +1,4 @@
-import { AgentstateClient, type ClientOptions } from "./client.js";
+import { HearsayClient, type ClientOptions } from "./client.js";
 import { toolToURI } from "./uri.js";
 import type { Operation, ConflictMode, Conflict, MailboxMessage } from "./types.js";
 
@@ -36,7 +36,7 @@ function resolveConflict(
     case "warn":
       return { permissionDecision: "allow", agentMessage: `⚠️ ${message}` };
     default:
-      console.warn(`[agentstate] invalid onConflict mode "${mode}", falling back to "warn"`);
+      console.warn(`[hearsay] invalid onConflict mode "${mode}", falling back to "warn"`);
       return { permissionDecision: "allow", agentMessage: `⚠️ ${message}` };
   }
 }
@@ -46,7 +46,7 @@ function formatMailboxMessage(msg: MailboxMessage): string {
 }
 
 async function checkCriticalMailbox(
-  client: AgentstateClient
+  client: HearsayClient
 ): Promise<MailboxMessage[]> {
   try {
     const msgs = await client.getMailbox({ unread: true });
@@ -79,7 +79,7 @@ export function createHooks(opts: HookOptions) {
         warned = false; // reset on success
       } catch (err) {
         if (!warned) {
-          console.warn(`[agentstate] heartbeat failed for ${claimId}: ${err}`);
+          console.warn(`[hearsay] heartbeat failed for ${claimId}: ${err}`);
           warned = true;
         }
       }
@@ -108,7 +108,7 @@ export function createHooks(opts: HookOptions) {
   };
 
   const hooks = {
-    client: new AgentstateClient(opts),
+    client: new HearsayClient(opts),
 
     async preToolUse(toolName: string, input: Record<string, unknown>): Promise<PreToolUseResult> {
       // Check for critical mailbox messages first
@@ -156,7 +156,7 @@ export function createHooks(opts: HookOptions) {
       } catch (err) {
         return {
           permissionDecision: "allow",
-          agentMessage: `agentstate unavailable — proceeding uncoordinated (${err})`,
+          agentMessage: `hearsay unavailable — proceeding uncoordinated (${err})`,
         };
       }
     },

@@ -9,18 +9,18 @@ import (
 	"os"
 	"time"
 
-	"github.com/thunder/agentstate/internal/a2a"
-	"github.com/thunder/agentstate/internal/managed"
-	"github.com/thunder/agentstate/internal/postgres"
-	"github.com/thunder/agentstate/internal/server"
-	"github.com/thunder/agentstate/internal/sqlite"
-	"github.com/thunder/agentstate/internal/watcher"
-	"github.com/thunder/agentstate/pkg/agentstate"
+	"github.com/gstranger/hearsay/internal/a2a"
+	"github.com/gstranger/hearsay/internal/managed"
+	"github.com/gstranger/hearsay/internal/postgres"
+	"github.com/gstranger/hearsay/internal/server"
+	"github.com/gstranger/hearsay/internal/sqlite"
+	"github.com/gstranger/hearsay/internal/watcher"
+	"github.com/gstranger/hearsay/pkg/hearsay"
 )
 
 func main() {
 	if len(os.Args) < 2 {
-		fmt.Fprintln(os.Stderr, "Usage: agentstate <command> [args]")
+		fmt.Fprintln(os.Stderr, "Usage: hearsay <command> [args]")
 		fmt.Fprintln(os.Stderr, "Commands: init, claim, release, heartbeat, query, check, namespace, serve, cursor, watch")
 		os.Exit(1)
 	}
@@ -53,7 +53,7 @@ func main() {
 	}
 }
 
-func loadClient() (*agentstate.Client, error) {
+func loadClient() (*hearsay.Client, error) {
 	provider, err := loadProvider()
 	if err != nil {
 		return nil, err
@@ -61,14 +61,14 @@ func loadClient() (*agentstate.Client, error) {
 	return loadClientFromProvider(provider)
 }
 
-func loadProvider() (agentstate.Provider, error) {
-	cfg, err := agentstate.LoadConfig(".agentstate.toml")
+func loadProvider() (hearsay.Provider, error) {
+	cfg, err := hearsay.LoadConfig(".hearsay.toml")
 	if err != nil {
 		return nil, fmt.Errorf("load config: %w", err)
 	}
 	switch cfg.Provider {
 	case "sqlite":
-		path := ".agentstate.db"
+		path := ".hearsay.db"
 		if cfg.ProviderCfg.SQLite != nil && cfg.ProviderCfg.SQLite.Path != "" {
 			path = cfg.ProviderCfg.SQLite.Path
 		}
@@ -102,22 +102,22 @@ func loadProvider() (agentstate.Provider, error) {
 	}
 }
 
-func loadClientFromProvider(provider agentstate.Provider) (*agentstate.Client, error) {
-	cfg, err := agentstate.LoadConfig(".agentstate.toml")
+func loadClientFromProvider(provider hearsay.Provider) (*hearsay.Client, error) {
+	cfg, err := hearsay.LoadConfig(".hearsay.toml")
 	if err != nil {
 		return nil, fmt.Errorf("load config: %w", err)
 	}
 	ctx := context.Background()
-	if err := provider.CreateNamespace(ctx, agentstate.Namespace{ID: cfg.Namespace, CreatedAt: time.Now()}); err != nil {
+	if err := provider.CreateNamespace(ctx, hearsay.Namespace{ID: cfg.Namespace, CreatedAt: time.Now()}); err != nil {
 		// namespace may already exist
 	}
-	return agentstate.NewClient(provider, cfg.Namespace), nil
+	return hearsay.NewClient(provider, cfg.Namespace), nil
 }
 
 func cmdInit(args []string) {
 	fs := flag.NewFlagSet("init", flag.ExitOnError)
 	provider := fs.String("provider", "sqlite", "provider type")
-	path := fs.String("path", ".agentstate.db", "sqlite path")
+	path := fs.String("path", ".hearsay.db", "sqlite path")
 	pgURL := fs.String("postgresql-url", "", "postgresql connection URL")
 	endpoint := fs.String("endpoint", "", "managed provider endpoint URL")
 	token := fs.String("token", "", "managed provider auth token")
@@ -127,25 +127,25 @@ func cmdInit(args []string) {
 	locking := fs.Bool("locking", false, "enable exclusive locking mode (claims are rejected if resource is already claimed)")
 	fs.Parse(args)
 
-	cfg := &agentstate.Config{
+	cfg := &hearsay.Config{
 		Version:   1,
 		Namespace: *namespace,
 		Provider:  *provider,
-		Defaults:  agentstate.DefaultsConfig{TTLSeconds: 300, AutoHeartbeat: true, Locking: *locking},
+		Defaults:  hearsay.DefaultsConfig{TTLSeconds: 300, AutoHeartbeat: true, Locking: *locking},
 	}
 	switch *provider {
 	case "sqlite":
-		cfg.ProviderCfg.SQLite = &agentstate.SQLiteConfig{Path: *path}
+		cfg.ProviderCfg.SQLite = &hearsay.SQLiteConfig{Path: *path}
 	case "postgresql":
-		cfg.ProviderCfg.PostgreSQL = &agentstate.PostgreSQLConfig{URL: *pgURL}
+		cfg.ProviderCfg.PostgreSQL = &hearsay.PostgreSQLConfig{URL: *pgURL}
 	case "managed":
-		cfg.ProviderCfg.Managed = &agentstate.ManagedConfig{Endpoint: *endpoint, Token: *token}
+		cfg.ProviderCfg.Managed = &hearsay.ManagedConfig{Endpoint: *endpoint, Token: *token}
 	}
-	if err := cfg.Save(".agentstate.toml"); err != nil {
+	if err := cfg.Save(".hearsay.toml"); err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		os.Exit(1)
 	}
-	fmt.Println("Created .agentstate.toml")
+	fmt.Println("Created .hearsay.toml")
 }
 
 func cmdClaim(args []string) {
@@ -153,11 +153,11 @@ func cmdClaim(args []string) {
 	resource := fs.String("resource", "", "resource URI")
 	op := fs.String("operation", "write", "operation")
 	intent := fs.String("intent", "", "intent string")
-	agentID := fs.String("agent", os.Getenv("AGENTSTATE_AGENT_ID"), "agent ID")
+	agentID := fs.String("agent", os.Getenv("HEARSAY_AGENT_ID"), "agent ID")
 	fs.Parse(args)
 
 	if *resource == "" {
-		fmt.Fprintln(os.Stderr, "Usage: agentstate claim --resource <uri> --operation <op> --intent <intent>")
+		fmt.Fprintln(os.Stderr, "Usage: hearsay claim --resource <uri> --operation <op> --intent <intent>")
 		os.Exit(1)
 	}
 
@@ -167,14 +167,14 @@ func cmdClaim(args []string) {
 		os.Exit(1)
 	}
 
-	resp, err := client.Claim(context.Background(), agentstate.ClaimRequest{
+	resp, err := client.Claim(context.Background(), hearsay.ClaimRequest{
 		ResourceURI: *resource,
 		AgentID:     *agentID,
-		Operation:   agentstate.Operation(*op),
+		Operation:   hearsay.Operation(*op),
 		Intent:      *intent,
 	})
 	if err != nil {
-		if ce, ok := err.(*agentstate.ConflictError); ok {
+		if ce, ok := err.(*hearsay.ConflictError); ok {
 			data, _ := json.MarshalIndent(ce.Report, "", "  ")
 			fmt.Fprintf(os.Stderr, "Conflict:\n%s\n", data)
 			os.Exit(2)
@@ -192,7 +192,7 @@ func cmdRelease(args []string) {
 	fs.Parse(args)
 
 	if *claimID == "" {
-		fmt.Fprintln(os.Stderr, "Usage: agentstate release --claim <id>")
+		fmt.Fprintln(os.Stderr, "Usage: hearsay release --claim <id>")
 		os.Exit(1)
 	}
 
@@ -202,7 +202,7 @@ func cmdRelease(args []string) {
 		os.Exit(1)
 	}
 
-	if err := client.Release(context.Background(), *claimID, agentstate.Outcome(*outcome)); err != nil {
+	if err := client.Release(context.Background(), *claimID, hearsay.Outcome(*outcome)); err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		os.Exit(1)
 	}
@@ -215,7 +215,7 @@ func cmdHeartbeat(args []string) {
 	fs.Parse(args)
 
 	if *claimID == "" {
-		fmt.Fprintln(os.Stderr, "Usage: agentstate heartbeat --claim <id>")
+		fmt.Fprintln(os.Stderr, "Usage: hearsay heartbeat --claim <id>")
 		os.Exit(1)
 	}
 
@@ -259,7 +259,7 @@ func cmdCheck(args []string) {
 	fs.Parse(args)
 
 	if *resource == "" {
-		fmt.Fprintln(os.Stderr, "Usage: agentstate check --resource <uri> --operation <op>")
+		fmt.Fprintln(os.Stderr, "Usage: hearsay check --resource <uri> --operation <op>")
 		os.Exit(1)
 	}
 
@@ -269,7 +269,7 @@ func cmdCheck(args []string) {
 		os.Exit(1)
 	}
 
-	report, err := client.CheckConflict(context.Background(), *resource, agentstate.Operation(*op))
+	report, err := client.CheckConflict(context.Background(), *resource, hearsay.Operation(*op))
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		os.Exit(1)
@@ -280,20 +280,20 @@ func cmdCheck(args []string) {
 
 func cmdNamespace(args []string) {
 	if len(args) < 1 {
-		fmt.Fprintln(os.Stderr, "Usage: agentstate namespace <create|delete|list>")
+		fmt.Fprintln(os.Stderr, "Usage: hearsay namespace <create|delete|list>")
 		os.Exit(1)
 	}
 	sub := args[0]
 	switch sub {
 	case "create":
 		if len(args) < 2 {
-			fmt.Fprintln(os.Stderr, "Usage: agentstate namespace create <id>")
+			fmt.Fprintln(os.Stderr, "Usage: hearsay namespace create <id>")
 			os.Exit(1)
 		}
 		fmt.Printf("Namespace %s created (config-only; namespace is created on first claim)\n", args[1])
 	case "delete":
 		if len(args) < 2 {
-			fmt.Fprintln(os.Stderr, "Usage: agentstate namespace delete <id>")
+			fmt.Fprintln(os.Stderr, "Usage: hearsay namespace delete <id>")
 			os.Exit(1)
 		}
 		fmt.Printf("Namespace %s deleted (config-only)\n", args[1])
@@ -314,7 +314,7 @@ func cmdServe(args []string) {
 	a2aBearerJWKSURL := fs.String("a2a-bearer-jwks-url", "", "JWKS URL for built-in JWT Bearer validation")
 	fs.Parse(args)
 
-	cfg, err := agentstate.LoadConfig(".agentstate.toml")
+	cfg, err := hearsay.LoadConfig(".hearsay.toml")
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error loading config: %v\n", err)
 		os.Exit(1)
@@ -333,9 +333,9 @@ func cmdServe(args []string) {
 	}
 
 	// Build A2A config from flags OR toml
-	var a2aCfg *agentstate.A2AConfig
+	var a2aCfg *hearsay.A2AConfig
 	if *a2aAddr != "" {
-		a2aCfg = &agentstate.A2AConfig{
+		a2aCfg = &hearsay.A2AConfig{
 			Addr:               *a2aAddr,
 			APIKey:             *a2aAPIKey,
 			BearerValidatorURL: *a2aBearerValidatorURL,
@@ -369,10 +369,10 @@ func cmdServe(args []string) {
 	}
 }
 
-func loadProviderFromConfig(cfg *agentstate.Config) (agentstate.Provider, error) {
+func loadProviderFromConfig(cfg *hearsay.Config) (hearsay.Provider, error) {
 	switch cfg.Provider {
 	case "sqlite":
-		path := ".agentstate.db"
+		path := ".hearsay.db"
 		if cfg.ProviderCfg.SQLite != nil && cfg.ProviderCfg.SQLite.Path != "" {
 			path = cfg.ProviderCfg.SQLite.Path
 		}
@@ -404,7 +404,7 @@ func cmdWatch(args []string) {
 	fs.Parse(args)
 
 	if *path == "" {
-		fmt.Fprintln(os.Stderr, "Usage: agentstate watch --path <dir> --namespace <id> [--claim-ttl <seconds>]")
+		fmt.Fprintln(os.Stderr, "Usage: hearsay watch --path <dir> --namespace <id> [--claim-ttl <seconds>]")
 		os.Exit(1)
 	}
 

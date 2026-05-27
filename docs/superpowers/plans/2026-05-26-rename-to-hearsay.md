@@ -1,8 +1,8 @@
-# Rename agentstate → hearsay Implementation Plan
+# Rename hearsay → hearsay Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Rename all internal identifiers from `agentstate` to `hearsay` — module path, binary, config file, env vars, package names, and user-facing strings.
+**Goal:** Rename all internal identifiers from `hearsay` to `hearsay` — module path, binary, config file, env vars, package names, and user-facing strings.
 
 **Architecture:** Pure mechanical rename via scripted find/replace. No behavior changes. Verification via `go test ./...` and `go build`.
 
@@ -15,9 +15,9 @@
 | Old Path | New Path | Notes |
 |---|---|---|
 | `go.mod` | `go.mod` | module path update |
-| `cmd/agentstate/` | `cmd/hearsay/` | directory rename |
-| `pkg/agentstate/` | `pkg/hearsay/` | directory rename |
-| `.agentstate.toml` | `.hearsay.toml` | config file name |
+| `cmd/hearsay/` | `cmd/hearsay/` | directory rename |
+| `pkg/hearsay/` | `pkg/hearsay/` | directory rename |
+| `.hearsay.toml` | `.hearsay.toml` | config file name |
 | All `.go` files | — | import paths, strings, package names |
 | All `.md` files | — | documentation strings |
 | All `.ts` files | — | SDK strings |
@@ -34,8 +34,8 @@
 - [ ] **Step 1: Update go.mod module line**
 
 ```bash
-cd ~/Documents/agentstate
-sed -i '' 's|module github.com/thunder/agentstate|module github.com/gstranger/hearsay|' go.mod
+cd ~/Documents/hearsay
+sed -i '' 's|module github.com/thunder/hearsay|module github.com/gstranger/hearsay|' go.mod
 ```
 
 - [ ] **Step 2: Verify go.mod change**
@@ -49,13 +49,13 @@ Expected: `module github.com/gstranger/hearsay`
 - [ ] **Step 3: Update all Go import statements**
 
 ```bash
-find . -name "*.go" -not -path "./vendor/*" -exec sed -i '' 's|github.com/thunder/agentstate|github.com/gstranger/hearsay|g' {} \;
+find . -name "*.go" -not -path "./vendor/*" -exec sed -i '' 's|github.com/thunder/hearsay|github.com/gstranger/hearsay|g' {} \;
 ```
 
 - [ ] **Step 4: Verify no old imports remain**
 
 ```bash
-grep -r "github.com/thunder/agentstate" --include="*.go" .
+grep -r "github.com/thunder/hearsay" --include="*.go" .
 ```
 
 Expected: (no output)
@@ -73,20 +73,20 @@ git commit -m "chore: rename Go module to github.com/gstranger/hearsay"
 ### Task 2: Rename Directories
 
 **Files:**
-- Rename: `cmd/agentstate/` → `cmd/hearsay/`
-- Rename: `pkg/agentstate/` → `pkg/hearsay/`
+- Rename: `cmd/hearsay/` → `cmd/hearsay/`
+- Rename: `pkg/hearsay/` → `pkg/hearsay/`
 
-- [ ] **Step 1: Rename cmd/agentstate to cmd/hearsay**
+- [ ] **Step 1: Rename cmd/hearsay to cmd/hearsay**
 
 ```bash
-cd ~/Documents/agentstate
-git mv cmd/agentstate cmd/hearsay
+cd ~/Documents/hearsay
+git mv cmd/hearsay cmd/hearsay
 ```
 
-- [ ] **Step 2: Rename pkg/agentstate to pkg/hearsay**
+- [ ] **Step 2: Rename pkg/hearsay to pkg/hearsay**
 
 ```bash
-git mv pkg/agentstate pkg/hearsay
+git mv pkg/hearsay pkg/hearsay
 ```
 
 - [ ] **Step 3: Verify directory structure**
@@ -100,7 +100,7 @@ Expected: both files exist
 - [ ] **Step 4: Commit**
 
 ```bash
-git commit -m "chore: rename cmd/agentstate and pkg/agentstate directories"
+git commit -m "chore: rename cmd/hearsay and pkg/hearsay directories"
 ```
 
 ---
@@ -117,24 +117,24 @@ git commit -m "chore: rename cmd/agentstate and pkg/agentstate directories"
 - [ ] **Step 1: Update binary name references in main.go**
 
 ```bash
-cd ~/Documents/agentstate
-sed -i '' 's/agentstate\b/hearsay/g' cmd/hearsay/main.go
+cd ~/Documents/hearsay
+sed -i '' 's/hearsay\b/hearsay/g' cmd/hearsay/main.go
 ```
 
-- [ ] **Step 2: Update config file name from .agentstate.toml to .hearsay.toml**
+- [ ] **Step 2: Update config file name from .hearsay.toml to .hearsay.toml**
 
 ```bash
-sed -i '' 's/\.agentstate\.toml/.hearsay.toml/g' cmd/hearsay/main.go
-sed -i '' 's/\.agentstate\.toml/.hearsay.toml/g' internal/watcher/watcher.go
-sed -i '' 's/\.agentstate\.toml/.hearsay.toml/g' pkg/hearsay/config.go
-sed -i '' 's/\.agentstate\.toml/.hearsay.toml/g' pkg/hearsay/config_test.go
-sed -i '' 's/\.agentstate\.toml/.hearsay.toml/g' tests/integration/a2a_test.go
+sed -i '' 's/\.hearsay\.toml/.hearsay.toml/g' cmd/hearsay/main.go
+sed -i '' 's/\.hearsay\.toml/.hearsay.toml/g' internal/watcher/watcher.go
+sed -i '' 's/\.hearsay\.toml/.hearsay.toml/g' pkg/hearsay/config.go
+sed -i '' 's/\.hearsay\.toml/.hearsay.toml/g' pkg/hearsay/config_test.go
+sed -i '' 's/\.hearsay\.toml/.hearsay.toml/g' tests/integration/a2a_test.go
 ```
 
 - [ ] **Step 3: Verify no old config references remain**
 
 ```bash
-grep -r "\.agentstate\.toml" --include="*.go" . | grep -v vendor
+grep -r "\.hearsay\.toml" --include="*.go" . | grep -v vendor
 ```
 
 Expected: (no output)
@@ -158,27 +158,27 @@ git commit -m "chore: rename binary and config file to hearsay"
 - [ ] **Step 1: Update env vars in main.go**
 
 ```bash
-cd ~/Documents/agentstate
-sed -i '' 's/AGENTSTATE_/HEARSAY_/g' cmd/hearsay/main.go
+cd ~/Documents/hearsay
+sed -i '' 's/HEARSAY_/HEARSAY_/g' cmd/hearsay/main.go
 ```
 
 - [ ] **Step 2: Update env vars in config.go**
 
 ```bash
-sed -i '' 's/AGENTSTATE_/HEARSAY_/g' pkg/hearsay/config.go
+sed -i '' 's/HEARSAY_/HEARSAY_/g' pkg/hearsay/config.go
 ```
 
 - [ ] **Step 3: Update env vars in README and docs**
 
 ```bash
-sed -i '' 's/AGENTSTATE_/HEARSAY_/g' README.md
-find docs -name "*.md" -exec sed -i '' 's/AGENTSTATE_/HEARSAY_/g' {} \;
+sed -i '' 's/HEARSAY_/HEARSAY_/g' README.md
+find docs -name "*.md" -exec sed -i '' 's/HEARSAY_/HEARSAY_/g' {} \;
 ```
 
 - [ ] **Step 4: Verify no old env vars remain**
 
 ```bash
-grep -r "AGENTSTATE_" --include="*.go" --include="*.md" . | grep -v vendor | grep -v node_modules
+grep -r "HEARSAY_" --include="*.go" --include="*.md" . | grep -v vendor | grep -v node_modules
 ```
 
 Expected: (no output)
@@ -195,21 +195,21 @@ git commit -m "chore: rename environment variable prefix to HEARSAY_"
 ### Task 5: Rename Package Names in Go Files
 
 **Files:**
-- Modify: All `.go` files using `agentstate` as package name
+- Modify: All `.go` files using `hearsay` as package name
 
-- [ ] **Step 1: Rename package agentstate to package hearsay in pkg/hearsay/**
+- [ ] **Step 1: Rename package hearsay to package hearsay in pkg/hearsay/**
 
 ```bash
-cd ~/Documents/agentstate
-find pkg/hearsay -name "*.go" -exec sed -i '' 's/^package agentstate$/package hearsay/' {} \;
+cd ~/Documents/hearsay
+find pkg/hearsay -name "*.go" -exec sed -i '' 's/^package hearsay$/package hearsay/' {} \;
 ```
 
-- [ ] **Step 2: Update all references to the agentstate package in other files**
+- [ ] **Step 2: Update all references to the hearsay package in other files**
 
 Find files that import the package and use it as a qualified identifier:
 
 ```bash
-grep -r "agentstate\.\|agentstate " --include="*.go" . | grep -v "hearsay" | grep -v vendor | head -20
+grep -r "hearsay\.\|hearsay " --include="*.go" . | grep -v "hearsay" | grep -v vendor | head -20
 ```
 
 Then update each file. Key files to check:
@@ -221,32 +221,32 @@ Then update each file. Key files to check:
 Use sed to replace the package qualifier:
 
 ```bash
-sed -i '' 's/agentstate\./hearsay./g' cmd/hearsay/main.go
-sed -i '' 's/agentstate\./hearsay./g' internal/server/server.go
-sed -i '' 's/agentstate\./hearsay./g' internal/server/server_test.go
-sed -i '' 's/agentstate\./hearsay./g' internal/server/mailbox_handlers.go
-sed -i '' 's/agentstate\./hearsay./g' internal/a2a/server.go
-sed -i '' 's/agentstate\./hearsay./g' internal/a2a/handler_tasks.go
-sed -i '' 's/agentstate\./hearsay./g' internal/a2a/handler_skills.go
-sed -i '' 's/agentstate\./hearsay./g' internal/a2a/task.go
-sed -i '' 's/agentstate\./hearsay./g' internal/a2a/mapper.go
-sed -i '' 's/agentstate\./hearsay./g' internal/a2a/agentcard.go
-sed -i '' 's/agentstate\./hearsay./g' internal/a2a/handler_test.go
-sed -i '' 's/agentstate\./hearsay./g' tests/integration/a2a_test.go
+sed -i '' 's/hearsay\./hearsay./g' cmd/hearsay/main.go
+sed -i '' 's/hearsay\./hearsay./g' internal/server/server.go
+sed -i '' 's/hearsay\./hearsay./g' internal/server/server_test.go
+sed -i '' 's/hearsay\./hearsay./g' internal/server/mailbox_handlers.go
+sed -i '' 's/hearsay\./hearsay./g' internal/a2a/server.go
+sed -i '' 's/hearsay\./hearsay./g' internal/a2a/handler_tasks.go
+sed -i '' 's/hearsay\./hearsay./g' internal/a2a/handler_skills.go
+sed -i '' 's/hearsay\./hearsay./g' internal/a2a/task.go
+sed -i '' 's/hearsay\./hearsay./g' internal/a2a/mapper.go
+sed -i '' 's/hearsay\./hearsay./g' internal/a2a/agentcard.go
+sed -i '' 's/hearsay\./hearsay./g' internal/a2a/handler_test.go
+sed -i '' 's/hearsay\./hearsay./g' tests/integration/a2a_test.go
 ```
 
-- [ ] **Step 3: Check for remaining `package agentstate` declarations**
+- [ ] **Step 3: Check for remaining `package hearsay` declarations**
 
 ```bash
-grep -r "^package agentstate$" --include="*.go" . | grep -v vendor
+grep -r "^package hearsay$" --include="*.go" . | grep -v vendor
 ```
 
 Expected: (no output)
 
-- [ ] **Step 4: Check for remaining `agentstate.` qualified references**
+- [ ] **Step 4: Check for remaining `hearsay.` qualified references**
 
 ```bash
-grep -r "agentstate\." --include="*.go" . | grep -v vendor | head -20
+grep -r "hearsay\." --include="*.go" . | grep -v vendor | head -20
 ```
 
 Expected: (no output) — if any found, fix them
@@ -255,7 +255,7 @@ Expected: (no output) — if any found, fix them
 
 ```bash
 git add -A
-git commit -m "chore: rename Go package references from agentstate to hearsay"
+git commit -m "chore: rename Go package references from hearsay to hearsay"
 ```
 
 ---
@@ -263,29 +263,29 @@ git commit -m "chore: rename Go package references from agentstate to hearsay"
 ### Task 6: Rename User-Facing Strings
 
 **Files:**
-- Modify: All `.go`, `.md`, `.ts`, `.json` files with user-facing "agentstate" strings
+- Modify: All `.go`, `.md`, `.ts`, `.json` files with user-facing "hearsay" strings
 
 - [ ] **Step 1: Update A2A Agent Card strings**
 
 ```bash
-cd ~/Documents/agentstate
-sed -i '' 's/"agentstate"/"hearsay"/g' internal/a2a/agentcard.go
+cd ~/Documents/hearsay
+sed -i '' 's/"hearsay"/"hearsay"/g' internal/a2a/agentcard.go
 sed -i '' 's/Agentstate /Hearsay /g' internal/a2a/agentcard.go
-sed -i '' 's/agentstate coordinator/hearsay coordinator/g' internal/a2a/agentcard.go
+sed -i '' 's/hearsay coordinator/hearsay coordinator/g' internal/a2a/agentcard.go
 ```
 
 - [ ] **Step 2: Update log messages and error strings in Go files**
 
 ```bash
-sed -i '' 's/agentstate/hearsay/g' internal/a2a/*.go
-sed -i '' 's/agentstate/hearsay/g' internal/server/*.go
-sed -i '' 's/agentstate/hearsay/g' internal/mailbox/*.go
-sed -i '' 's/agentstate/hearsay/g' internal/watcher/*.go
-sed -i '' 's/agentstate/hearsay/g' internal/managed/*.go
-sed -i '' 's/agentstate/hearsay/g' internal/sqlite/*.go
-sed -i '' 's/agentstate/hearsay/g' internal/postgres/*.go
-sed -i '' 's/agentstate/hearsay/g' internal/memory/*.go
-sed -i '' 's/agentstate/hearsay/g' cmd/hearsay/*.go
+sed -i '' 's/hearsay/hearsay/g' internal/a2a/*.go
+sed -i '' 's/hearsay/hearsay/g' internal/server/*.go
+sed -i '' 's/hearsay/hearsay/g' internal/mailbox/*.go
+sed -i '' 's/hearsay/hearsay/g' internal/watcher/*.go
+sed -i '' 's/hearsay/hearsay/g' internal/managed/*.go
+sed -i '' 's/hearsay/hearsay/g' internal/sqlite/*.go
+sed -i '' 's/hearsay/hearsay/g' internal/postgres/*.go
+sed -i '' 's/hearsay/hearsay/g' internal/memory/*.go
+sed -i '' 's/hearsay/hearsay/g' cmd/hearsay/*.go
 ```
 
 **Caution:** Be careful with imports — they've already been updated. The sed above should only touch string literals, comments, and log messages since the import paths were already changed.
@@ -293,36 +293,36 @@ sed -i '' 's/agentstate/hearsay/g' cmd/hearsay/*.go
 - [ ] **Step 3: Update TypeScript SDK**
 
 ```bash
-sed -i '' 's/agentstate/hearsay/g' sdk/typescript/src/*.ts
-sed -i '' 's/agentstate/hearsay/g' sdk/typescript/test/*.ts
-sed -i '' 's/agentstate/hearsay/g' sdk/typescript/package.json
+sed -i '' 's/hearsay/hearsay/g' sdk/typescript/src/*.ts
+sed -i '' 's/hearsay/hearsay/g' sdk/typescript/test/*.ts
+sed -i '' 's/hearsay/hearsay/g' sdk/typescript/package.json
 ```
 
 - [ ] **Step 4: Update Cursor extension**
 
 ```bash
-sed -i '' 's/agentstate/hearsay/g' sdk/cursor/README.md
-sed -i '' 's/agentstate/hearsay/g' sdk/cursor/hooks.json
+sed -i '' 's/hearsay/hearsay/g' sdk/cursor/README.md
+sed -i '' 's/hearsay/hearsay/g' sdk/cursor/hooks.json
 ```
 
 - [ ] **Step 5: Update documentation**
 
 ```bash
-sed -i '' 's/agentstate/hearsay/g' README.md
-find docs -name "*.md" -exec sed -i '' 's/agentstate/hearsay/g' {} \;
+sed -i '' 's/hearsay/hearsay/g' README.md
+find docs -name "*.md" -exec sed -i '' 's/hearsay/hearsay/g' {} \;
 ```
 
 - [ ] **Step 6: Update pi-extension**
 
 ```bash
-sed -i '' 's/agentstate/hearsay/g' sdk/pi-extension/agentstate.ts
+sed -i '' 's/hearsay/hearsay/g' sdk/pi-extension/hearsay.ts
 ```
 
 - [ ] **Step 7: Commit**
 
 ```bash
 git add -A
-git commit -m "chore: rename user-facing strings from agentstate to hearsay"
+git commit -m "chore: rename user-facing strings from hearsay to hearsay"
 ```
 
 ---
@@ -335,7 +335,7 @@ git commit -m "chore: rename user-facing strings from agentstate to hearsay"
 - [ ] **Step 1: Run go mod tidy**
 
 ```bash
-cd ~/Documents/agentstate
+cd ~/Documents/hearsay
 go mod tidy
 ```
 
@@ -370,7 +370,7 @@ git commit -m "chore: go mod tidy after rename"
 - [ ] **Step 1: Build the binary**
 
 ```bash
-cd ~/Documents/agentstate
+cd ~/Documents/hearsay
 go build ./cmd/hearsay
 ```
 
@@ -382,7 +382,7 @@ Expected: Creates `./hearsay` binary, no errors
 ./hearsay --help 2>&1 | head -5
 ```
 
-Expected: Shows "hearsay" in usage, not "agentstate"
+Expected: Shows "hearsay" in usage, not "hearsay"
 
 - [ ] **Step 3: Run all tests**
 
@@ -404,7 +404,7 @@ Expected: All integration tests pass
 
 ```bash
 git add -A
-git commit -m "chore: verify build and tests after agentstate → hearsay rename"
+git commit -m "chore: verify build and tests after hearsay → hearsay rename"
 ```
 
 ---
@@ -414,7 +414,7 @@ git commit -m "chore: verify build and tests after agentstate → hearsay rename
 - [ ] **Step 1: Push all commits**
 
 ```bash
-cd ~/Documents/agentstate
+cd ~/Documents/hearsay
 git push origin main
 ```
 
@@ -424,7 +424,7 @@ Expected: Pushes successfully
 
 Visit: https://github.com/gstranger/hearsay
 
-Expected: README shows "hearsay" everywhere, no "agentstate" references
+Expected: README shows "hearsay" everywhere, no "hearsay" references
 
 ---
 

@@ -9,10 +9,10 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/thunder/agentstate/pkg/agentstate"
+	"github.com/gstranger/hearsay/pkg/hearsay"
 )
 
-// CursorState is persisted to /tmp/agentstate-cursor-<session-id>.json
+// CursorState is persisted to /tmp/hearsay-cursor-<session-id>.json
 type CursorState struct {
 	SessionID    string            `json:"session_id"`
 	Namespace    string            `json:"namespace"`
@@ -21,7 +21,7 @@ type CursorState struct {
 }
 
 func cursorStateFilePath(sessionID string) string {
-	return filepath.Join(os.TempDir(), fmt.Sprintf("agentstate-cursor-%s.json", sessionID))
+	return filepath.Join(os.TempDir(), fmt.Sprintf("hearsay-cursor-%s.json", sessionID))
 }
 
 func loadCursorState(sessionID string) (*CursorState, error) {
@@ -54,7 +54,7 @@ func saveCursorState(state *CursorState) error {
 
 func cmdCursor(args []string) {
 	if len(args) < 1 {
-		fmt.Fprintln(os.Stderr, "Usage: agentstate cursor <subcommand>")
+		fmt.Fprintln(os.Stderr, "Usage: hearsay cursor <subcommand>")
 		fmt.Fprintln(os.Stderr, "Subcommands: session-start, pre-tool-use, post-tool-use, session-end")
 		os.Exit(1)
 	}
@@ -134,7 +134,7 @@ func cmdCursorPreToolUse(args []string) {
 
 	// Fall back to env var if flag not provided
 	if onConflict == "" {
-		onConflict = os.Getenv("AGENTSTATE_ON_CONFLICT")
+		onConflict = os.Getenv("HEARSAY_ON_CONFLICT")
 	}
 	if onConflict == "" {
 		onConflict = "warn"
@@ -142,14 +142,14 @@ func cmdCursorPreToolUse(args []string) {
 
 	state, err := loadCursorState(sessionID)
 	if err != nil {
-		fmt.Println(`{"permission":"allow","agent_message":"agentstate coordination unavailable — proceeding uncoordinated"}`)
+		fmt.Println(`{"permission":"allow","agent_message":"hearsay coordination unavailable — proceeding uncoordinated"}`)
 		os.Exit(0)
 	}
 
 	ctx := context.Background()
 	client, err := loadClient()
 	if err != nil {
-		fmt.Println(`{"permission":"allow","agent_message":"agentstate coordination unavailable — proceeding uncoordinated"}`)
+		fmt.Println(`{"permission":"allow","agent_message":"hearsay coordination unavailable — proceeding uncoordinated"}`)
 		os.Exit(0)
 	}
 
@@ -193,17 +193,17 @@ func cmdCursorPreToolUse(args []string) {
 		os.Exit(0)
 	}
 
-	req := agentstate.ClaimRequest{
+	req := hearsay.ClaimRequest{
 		AgentID:     state.AgentID,
 		ResourceURI: resourceURI,
-		Operation:   agentstate.Operation(operation),
+		Operation:   hearsay.Operation(operation),
 		Intent:      fmt.Sprintf("cursor-%s: %s", toolName, resourceURI),
 		TTLSeconds:  300,
 	}
 
 	resp, err := client.Claim(ctx, req)
 	if err != nil {
-		fmt.Println(`{"permission":"allow","agent_message":"agentstate coordination unavailable — proceeding uncoordinated"}`)
+		fmt.Println(`{"permission":"allow","agent_message":"hearsay coordination unavailable — proceeding uncoordinated"}`)
 		os.Exit(0)
 	}
 
@@ -267,7 +267,7 @@ func cmdCursorPostToolUse(args []string) {
 	}
 
 	if client != nil {
-		_ = client.Release(ctx, claimId, agentstate.OutcomeSucceeded)
+		_ = client.Release(ctx, claimId, hearsay.OutcomeSucceeded)
 	}
 	delete(state.ActiveClaims, toolCallId)
 	_ = saveCursorState(state)
@@ -299,7 +299,7 @@ func cmdCursorSessionEnd(args []string) {
 
 	for _, claimId := range state.ActiveClaims {
 		if client != nil {
-			_ = client.Release(ctx, claimId, agentstate.OutcomeAbandoned)
+			_ = client.Release(ctx, claimId, hearsay.OutcomeAbandoned)
 		}
 	}
 

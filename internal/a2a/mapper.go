@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/thunder/agentstate/pkg/agentstate"
+	"github.com/gstranger/hearsay/pkg/hearsay"
 )
 
 type SkillParams struct {
@@ -36,21 +36,21 @@ func extractParams(parts []Part) (*SkillParams, error) {
 	return nil, fmt.Errorf("no data part found in message")
 }
 
-func mapToClaimRequest(params *SkillParams) agentstate.ClaimRequest {
-	return agentstate.ClaimRequest{
+func mapToClaimRequest(params *SkillParams) hearsay.ClaimRequest {
+	return hearsay.ClaimRequest{
 		ResourceURI: params.ResourceURI,
 		AgentID:     params.AgentID,
-		Operation:   agentstate.Operation(params.Operation),
+		Operation:   hearsay.Operation(params.Operation),
 		Intent:      params.Intent,
 		TTLSeconds:  params.TTLSeconds,
 	}
 }
 
-func mapToMailboxMessage(params *SkillParams) agentstate.MailboxMessage {
-	return agentstate.MailboxMessage{
+func mapToMailboxMessage(params *SkillParams) hearsay.MailboxMessage {
+	return hearsay.MailboxMessage{
 		From:           "", // set by caller
 		To:             params.To,
-		Type:           agentstate.MailboxType(params.MsgType),
+		Type:           hearsay.MailboxType(params.MsgType),
 		Content:        params.Content,
 		RelatedClaimID: params.RelatedClaimID,
 	}

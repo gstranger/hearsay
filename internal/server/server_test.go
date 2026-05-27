@@ -10,17 +10,17 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/thunder/agentstate/internal/memory"
-	"github.com/thunder/agentstate/pkg/agentstate"
+	"github.com/gstranger/hearsay/internal/memory"
+	"github.com/gstranger/hearsay/pkg/hearsay"
 )
 
 func setupTestServer(t *testing.T) (*Server, func()) {
 	ctx := context.Background()
 	p := memory.New()
-	if err := p.CreateNamespace(ctx, agentstate.Namespace{ID: "test"}); err != nil {
+	if err := p.CreateNamespace(ctx, hearsay.Namespace{ID: "test"}); err != nil {
 		t.Fatal(err)
 	}
-	client := agentstate.NewClient(p, "test")
+	client := hearsay.NewClient(p, "test")
 	return New(client, p, false), func() {}
 }
 
@@ -40,10 +40,10 @@ func get(t *testing.T, srv *Server, path string) *http.Response {
 
 func TestHandleClaim(t *testing.T) {
 	s, _ := setupTestServer(t)
-	reqBody, _ := json.Marshal(agentstate.ClaimRequest{
+	reqBody, _ := json.Marshal(hearsay.ClaimRequest{
 		ResourceURI: "file://x.ts",
 		AgentID:     "a1",
-		Operation:   agentstate.OpWrite,
+		Operation:   hearsay.OpWrite,
 		Intent:      "test",
 	})
 	req := httptest.NewRequest("POST", "/claim", bytes.NewReader(reqBody))
@@ -53,7 +53,7 @@ func TestHandleClaim(t *testing.T) {
 	if rec.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
 	}
-	var resp agentstate.ClaimResponse
+	var resp hearsay.ClaimResponse
 	json.Unmarshal(rec.Body.Bytes(), &resp)
 	if resp.ClaimID == "" {
 		t.Fatal("expected claim ID")
@@ -63,14 +63,14 @@ func TestHandleClaim(t *testing.T) {
 func TestHandleClaim_Conflict(t *testing.T) {
 	s, _ := setupTestServer(t)
 	// First claim
-	reqBody, _ := json.Marshal(agentstate.ClaimRequest{
-		ResourceURI: "file://x.ts", AgentID: "a1", Operation: agentstate.OpWrite, Intent: "first",
+	reqBody, _ := json.Marshal(hearsay.ClaimRequest{
+		ResourceURI: "file://x.ts", AgentID: "a1", Operation: hearsay.OpWrite, Intent: "first",
 	})
 	s.ServeHTTP(httptest.NewRecorder(), httptest.NewRequest("POST", "/claim", bytes.NewReader(reqBody)))
 
 	// Second claim — conflict
-	reqBody2, _ := json.Marshal(agentstate.ClaimRequest{
-		ResourceURI: "file://x.ts", AgentID: "a2", Operation: agentstate.OpWrite, Intent: "second",
+	reqBody2, _ := json.Marshal(hearsay.ClaimRequest{
+		ResourceURI: "file://x.ts", AgentID: "a2", Operation: hearsay.OpWrite, Intent: "second",
 	})
 	rec := httptest.NewRecorder()
 	s.ServeHTTP(rec, httptest.NewRequest("POST", "/claim", bytes.NewReader(reqBody2)))
@@ -83,8 +83,8 @@ func TestHandleClaim_Conflict(t *testing.T) {
 func TestHandleCheck(t *testing.T) {
 	s, _ := setupTestServer(t)
 	// Claim first
-	reqBody, _ := json.Marshal(agentstate.ClaimRequest{
-		ResourceURI: "file://x.ts", AgentID: "a1", Operation: agentstate.OpWrite, Intent: "x",
+	reqBody, _ := json.Marshal(hearsay.ClaimRequest{
+		ResourceURI: "file://x.ts", AgentID: "a1", Operation: hearsay.OpWrite, Intent: "x",
 	})
 	s.ServeHTTP(httptest.NewRecorder(), httptest.NewRequest("POST", "/claim", bytes.NewReader(reqBody)))
 
@@ -95,7 +95,7 @@ func TestHandleCheck(t *testing.T) {
 	if rec.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d", rec.Code)
 	}
-	var report agentstate.ConflictReport
+	var report hearsay.ConflictReport
 	json.Unmarshal(rec.Body.Bytes(), &report)
 	if !report.HasConflict {
 		t.Fatal("expected conflict")
@@ -131,7 +131,7 @@ func TestGetMailbox(t *testing.T) {
 		t.Fatalf("expected 200, got %d", resp.StatusCode)
 	}
 
-	var msgs []agentstate.MailboxMessage
+	var msgs []hearsay.MailboxMessage
 	json.NewDecoder(resp.Body).Decode(&msgs)
 	if len(msgs) != 1 {
 		t.Fatalf("expected 1 message, got %d", len(msgs))
@@ -149,7 +149,7 @@ func TestMarkRead(t *testing.T) {
 	post(t, srv, "/message", body)
 
 	resp := get(t, srv, "/mailbox?namespace=test&agent_id=agent-B&unread=true")
-	var msgs []agentstate.MailboxMessage
+	var msgs []hearsay.MailboxMessage
 	json.NewDecoder(resp.Body).Decode(&msgs)
 	msgID := msgs[0].MessageID
 
@@ -174,7 +174,7 @@ func TestArchiveMessage(t *testing.T) {
 	post(t, srv, "/message", body)
 
 	resp := get(t, srv, "/mailbox?namespace=test&agent_id=agent-B")
-	var msgs []agentstate.MailboxMessage
+	var msgs []hearsay.MailboxMessage
 	json.NewDecoder(resp.Body).Decode(&msgs)
 	msgID := msgs[0].MessageID
 

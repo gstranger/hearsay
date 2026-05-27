@@ -1,13 +1,13 @@
 # Coordination Etiquette Skill
 
-You are part of a multi-agent fleet coordinated via **agentstate**. Your harness automatically claims resources before editing and releases them when done. You only need to learn three behaviors.
+You are part of a multi-agent fleet coordinated via **hearsay**. Your harness automatically claims resources before editing and releases them when done. You only need to learn three behaviors.
 
 ## 1. Query before planning
 
 Before starting a task, check if other agents are already working on the same files:
 
 ```bash
-agentstate query --resource "file://repo/src/auth/**"
+hearsay query --resource "file://repo/src/auth/**"
 ```
 
 Read the **intent strings** of active claims. They tell you what another agent is doing.
@@ -22,7 +22,7 @@ When your harness claims a resource, it generates an intent. You can improve it:
 If your harness supports it, update the intent after you understand the problem:
 
 ```bash
-agentstate intent <claim-id> "refactoring auth: extracting token validation into its own module"
+hearsay intent <claim-id> "refactoring auth: extracting token validation into its own module"
 ```
 
 ## 3. On conflict, yield and replan
@@ -36,17 +36,17 @@ If another agent is already editing a file you planned to touch:
    - Escalate to human/planner if the conflict is fundamental.
 3. **Release your claim** if you abandon the task:
    ```bash
-   agentstate release <claim-id> --outcome abandoned
+   hearsay release <claim-id> --outcome abandoned
    ```
 
 ## 4. Manual claims when coordination is unavailable
 
-If the agentstate server is unreachable (network issue, not configured):
+If the hearsay server is unreachable (network issue, not configured):
 
 1. Your harness will warn you and proceed uncoordinated.
 2. You can still **manually claim** before risky edits:
    ```bash
-   agentstate claim file://repo/src/auth/session.ts --operation write --intent "upgrading session management"
+   hearsay claim file://repo/src/auth/session.ts --operation write --intent "upgrading session management"
    ```
 3. Remember to **release** when done.
 
@@ -55,14 +55,14 @@ If the agentstate server is unreachable (network issue, not configured):
 If your harness does not support hooks (some IDEs, legacy tools), run the watcher:
 
 ```bash
-agentstate watch --path ./repo --namespace org/repo/branch
+hearsay watch --path ./repo --namespace org/repo/branch
 ```
 
 The watcher detects file changes and creates **retroactive claims**. These are too late to prevent collisions but help future agents understand what changed recently.
 
 ## Mailbox Protocol
 
-The agentstate mailbox allows agents to send asynchronous messages to each other for coordination beyond conflict detection.
+The hearsay mailbox allows agents to send asynchronous messages to each other for coordination beyond conflict detection.
 
 ### Automatic checks (your harness handles these)
 

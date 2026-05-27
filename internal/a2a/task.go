@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/thunder/agentstate/pkg/agentstate"
+	"github.com/gstranger/hearsay/pkg/hearsay"
 )
 
 type Task struct {
@@ -16,7 +16,7 @@ type Task struct {
 	Artifacts []Artifact             `json:"artifacts,omitempty"`
 	Metadata  map[string]any         `json:"metadata,omitempty"`
 
-	// Internal: maps to agentstate
+	// Internal: maps to hearsay
 	ClaimID   string `json:"-"`
 	Namespace string `json:"-"`
 }
@@ -100,10 +100,10 @@ func NewTask(id, sessionID, namespace string) *Task {
 	}
 }
 
-func taskToStorage(t *Task) *agentstate.A2ATask {
+func taskToStorage(t *Task) *hearsay.A2ATask {
 	statusMsg, _ := json.Marshal(t.Status.Message)
 	metadata, _ := json.Marshal(t.Metadata)
-	return &agentstate.A2ATask{
+	return &hearsay.A2ATask{
 		ID: t.ID, SessionID: t.SessionID, State: string(t.Status.State),
 		StatusMsg: statusMsg, StatusTime: t.Status.Timestamp,
 		ClaimID: t.ClaimID, Namespace: t.Namespace, Metadata: metadata,
@@ -111,7 +111,7 @@ func taskToStorage(t *Task) *agentstate.A2ATask {
 	}
 }
 
-func storageToTask(st *agentstate.A2ATask) *Task {
+func storageToTask(st *hearsay.A2ATask) *Task {
 	var msg *Message
 	if len(st.StatusMsg) > 0 {
 		json.Unmarshal(st.StatusMsg, &msg)

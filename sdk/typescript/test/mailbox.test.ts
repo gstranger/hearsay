@@ -1,11 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { AgentstateClient } from "../src/client.js";
+import { HearsayClient } from "../src/client.js";
 
 const mockFetch = vi.fn();
 global.fetch = mockFetch;
 
 describe("Mailbox", () => {
-  const client = new AgentstateClient({
+  const client = new HearsayClient({
     endpoint: "http://localhost:8080",
     namespace: "test-ns",
     agentId: "agent-A",

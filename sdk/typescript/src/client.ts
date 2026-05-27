@@ -7,7 +7,7 @@ export interface ClientOptions {
   defaultTTL?: number;
 }
 
-export class AgentstateClient {
+export class HearsayClient {
   private opts: Required<ClientOptions>;
 
   constructor(opts: ClientOptions) {

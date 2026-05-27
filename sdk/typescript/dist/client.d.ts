@@ -5,7 +5,7 @@ export interface ClientOptions {
     agentId: string;
     defaultTTL?: number;
 }
-export declare class AgentstateClient {
+export declare class HearsayClient {
     private opts;
     constructor(opts: ClientOptions);
     private post;

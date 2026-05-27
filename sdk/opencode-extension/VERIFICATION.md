@@ -3,7 +3,7 @@
 ## Unit Tests (Automated)
 
 ```bash
-cd agentstate/sdk/opencode-extension
+cd hearsay/sdk/opencode-extension
 npm install
 npm test
 ```
@@ -26,19 +26,19 @@ Since we can't run OpenCode in CI, here's how to verify the plugin works end-to-
 ### Prerequisites
 
 1. Install OpenCode: https://opencode.ai
-2. Install agentstate: `go install github.com/thunder/agentstate/cmd/agentstate@latest`
+2. Install hearsay: `go install github.com/thunder/hearsay/cmd/hearsay@latest`
 3. Have a project with `.opencode/plugins/` directory
 
 ### Setup
 
 ```bash
 # 1. Copy plugin to your project
-cp agentstate/sdk/opencode-extension/agentstate.ts your-project/.opencode/plugins/
+cp hearsay/sdk/opencode-extension/hearsay.ts your-project/.opencode/plugins/
 
 # 2. Set env vars
-export AGENTSTATE_NAMESPACE=test/manual
-export AGENTSTATE_AGENT_ID=opencode:manual-test
-export AGENTSTATE_ON_CONFLICT=block  # Start with block mode
+export HEARSAY_NAMESPACE=test/manual
+export HEARSAY_AGENT_ID=opencode:manual-test
+export HEARSAY_ON_CONFLICT=block  # Start with block mode
 
 # 3. Start OpenCode in your project directory
 opencode
@@ -48,10 +48,10 @@ opencode
 
 #### Test 1: Auto-start
 
-1. Ensure no agentstate server is running: `pkill agentstate`
+1. Ensure no hearsay server is running: `pkill hearsay`
 2. Start OpenCode
 3. Ask the agent: "Read the file README.md"
-4. **Expected**: The plugin auto-starts `agentstate serve` in the background
+4. **Expected**: The plugin auto-starts `hearsay serve` in the background
 5. Verify: `curl http://localhost:8080/health` should return 200
 
 #### Test 2: Block mode (default)
@@ -70,7 +70,7 @@ opencode
 
 #### Test 3: Allow mode
 
-1. Stop OpenCode, set: `export AGENTSTATE_ON_CONFLICT=allow`
+1. Stop OpenCode, set: `export HEARSAY_ON_CONFLICT=allow`
 2. Repeat the claim from Test 2 (or wait for it to expire and re-create)
 3. Ask: "Write 'world' to test.txt"
 4. **Expected**: Tool proceeds silently, file is written
@@ -78,7 +78,7 @@ opencode
 
 #### Test 4: Warn mode (experimental)
 
-1. Stop OpenCode, set: `export AGENTSTATE_ON_CONFLICT=warn`
+1. Stop OpenCode, set: `export HEARSAY_ON_CONFLICT=warn`
 2. Repeat the claim from Test 2
 3. Ask: "Write 'warned' to test.txt"
 4. **Expected**: Tool proceeds, file is written
@@ -99,7 +99,7 @@ opencode
 #### Test 6: Graceful degradation
 
 1. Start OpenCode with a working server
-2. Kill the server mid-session: `pkill agentstate`
+2. Kill the server mid-session: `pkill hearsay`
 3. Ask the agent to write another file
 4. **Expected**: Tool proceeds with a console warning, no crash
 

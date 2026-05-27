@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/thunder/agentstate/pkg/agentstate"
+	"github.com/gstranger/hearsay/pkg/hearsay"
 	_ "modernc.org/sqlite"
 )
 
@@ -107,7 +107,7 @@ CREATE TABLE IF NOT EXISTS a2a_artifacts (
 	return err
 }
 
-func (p *Provider) CreateNamespace(ctx context.Context, ns agentstate.Namespace) error {
+func (p *Provider) CreateNamespace(ctx context.Context, ns hearsay.Namespace) error {
 	_, err := p.db.ExecContext(ctx, "INSERT INTO namespaces (id, created_at) VALUES (?, ?)", ns.ID, ns.CreatedAt)
 	return err
 }
@@ -142,7 +142,7 @@ func (p *Provider) DeleteNamespace(ctx context.Context, namespaceID string) erro
 	return tx.Commit()
 }
 
-func (p *Provider) Append(ctx context.Context, namespaceID string, msgs []agentstate.Message) error {
+func (p *Provider) Append(ctx context.Context, namespaceID string, msgs []hearsay.Message) error {
 	tx, err := p.db.BeginTx(ctx, nil)
 	if err != nil {
 		return err
@@ -175,7 +175,7 @@ func (p *Provider) Append(ctx context.Context, namespaceID string, msgs []agents
 	return tx.Commit()
 }
 
-func (p *Provider) Query(ctx context.Context, namespaceID string, opts agentstate.QueryOpts) ([]agentstate.Message, error) {
+func (p *Provider) Query(ctx context.Context, namespaceID string, opts hearsay.QueryOpts) ([]hearsay.Message, error) {
 	query := "SELECT offset, type, agent_id, payload, timestamp FROM messages WHERE namespace = ? AND offset > ?"
 	args := []any{namespaceID, opts.Since}
 
@@ -202,9 +202,9 @@ func (p *Provider) Query(ctx context.Context, namespaceID string, opts agentstat
 	}
 	defer rows.Close()
 
-	var result []agentstate.Message
+	var result []hearsay.Message
 	for rows.Next() {
-		var m agentstate.Message
+		var m hearsay.Message
 		var payload string
 		if err := rows.Scan(&m.Offset, &m.Type, &m.AgentID, &payload, &m.Timestamp); err != nil {
 			return nil, err
@@ -216,20 +216,20 @@ func (p *Provider) Query(ctx context.Context, namespaceID string, opts agentstat
 	return result, rows.Err()
 }
 
-func (p *Provider) Subscribe(ctx context.Context, namespaceID string, from agentstate.Offset) (<-chan agentstate.Message, error) {
-	ch := make(chan agentstate.Message, 100)
+func (p *Provider) Subscribe(ctx context.Context, namespaceID string, from hearsay.Offset) (<-chan hearsay.Message, error) {
+	ch := make(chan hearsay.Message, 100)
 	go func() {
 		defer close(ch)
 		current := from
 		for {
-			msgs, err := p.Query(ctx, namespaceID, agentstate.QueryOpts{Since: current})
+			msgs, err := p.Query(ctx, namespaceID, hearsay.QueryOpts{Since: current})
 			if err != nil {
 				return
 			}
 			for _, m := range msgs {
 				select {
 				case ch <- m:
-					current = agentstate.Offset(m.Offset)
+					current = hearsay.Offset(m.Offset)
 				case <-ctx.Done():
 					return
 				}
@@ -244,27 +244,27 @@ func (p *Provider) Subscribe(ctx context.Context, namespaceID string, from agent
 	return ch, nil
 }
 
-func (p *Provider) ActiveClaims(ctx context.Context, namespaceID string, resourcePattern string) ([]agentstate.Claim, error) {
-	msgs, err := p.Query(ctx, namespaceID, agentstate.QueryOpts{
-		Types: []agentstate.MessageType{agentstate.MsgClaim, agentstate.MsgRelease, agentstate.MsgTransfer},
+func (p *Provider) ActiveClaims(ctx context.Context, namespaceID string, resourcePattern string) ([]hearsay.Claim, error) {
+	msgs, err := p.Query(ctx, namespaceID, hearsay.QueryOpts{
+		Types: []hearsay.MessageType{hearsay.MsgClaim, hearsay.MsgRelease, hearsay.MsgTransfer},
 	})
 	if err != nil {
 		return nil, err
 	}
-	var result []agentstate.Claim
-	for _, c := range agentstate.FilterActiveClaims(msgs) {
-		if agentstate.ResourceMatchesPattern(resourcePattern, c.ResourceURI) {
+	var result []hearsay.Claim
+	for _, c := range hearsay.FilterActiveClaims(msgs) {
+		if hearsay.ResourceMatchesPattern(resourcePattern, c.ResourceURI) {
 			result = append(result, c)
 		}
 	}
 	return result, nil
 }
 
-func (p *Provider) AgentState(ctx context.Context, namespaceID string, agentID string) (agentstate.AgentState, error) {
+func (p *Provider) AgentState(ctx context.Context, namespaceID string, agentID string) (hearsay.AgentState, error) {
 	// Query all messages so we see cross-agent releases and compute accurate lastSeen.
-	msgs, err := p.Query(ctx, namespaceID, agentstate.QueryOpts{})
+	msgs, err := p.Query(ctx, namespaceID, hearsay.QueryOpts{})
 	if err != nil {
-		return agentstate.AgentState{}, err
+		return hearsay.AgentState{}, err
 	}
 	var active []string
 	var lastSeen time.Time
@@ -273,19 +273,19 @@ func (p *Provider) AgentState(ctx context.Context, namespaceID string, agentID s
 			lastSeen = m.Timestamp
 		}
 	}
-	for _, c := range agentstate.FilterActiveClaims(msgs) {
+	for _, c := range hearsay.FilterActiveClaims(msgs) {
 		if c.AgentID == agentID {
 			active = append(active, c.ClaimID)
 		}
 	}
-	return agentstate.AgentState{AgentID: agentID, ActiveClaims: active, LastSeen: lastSeen}, nil
+	return hearsay.AgentState{AgentID: agentID, ActiveClaims: active, LastSeen: lastSeen}, nil
 }
 
 func (p *Provider) ReleaseExpired(ctx context.Context, namespaceID string, before time.Time) error {
 	return nil
 }
 
-func (p *Provider) SendMessage(ctx context.Context, namespace string, msg agentstate.MailboxMessage) error {
+func (p *Provider) SendMessage(ctx context.Context, namespace string, msg hearsay.MailboxMessage) error {
 	if msg.CreatedAt.IsZero() {
 		msg.CreatedAt = time.Now().UTC()
 	}
@@ -300,13 +300,13 @@ func (p *Provider) SendMessage(ctx context.Context, namespace string, msg agents
 	return err
 }
 
-func (p *Provider) GetMailbox(ctx context.Context, namespace string, agentID string, opts agentstate.MailboxQueryOpts) ([]agentstate.MailboxMessage, error) {
+func (p *Provider) GetMailbox(ctx context.Context, namespace string, agentID string, opts hearsay.MailboxQueryOpts) ([]hearsay.MailboxMessage, error) {
 	// TODO: If opts.IncludeClaims is true, expand related_claim_id into a Claim struct.
 	// This requires a JOIN with claims data or a secondary query.
 	query := `SELECT message_id, from_agent, to_agent, message_type, content, related_claim_id, read, archived, created_at, expires_at
 			  FROM mailbox_messages
 			  WHERE namespace = ? AND (to_agent = ? OR to_agent = ?) AND archived = FALSE AND expires_at > CURRENT_TIMESTAMP`
-	args := []any{namespace, agentID, agentstate.MailboxToBroadcast}
+	args := []any{namespace, agentID, hearsay.MailboxToBroadcast}
 
 	if opts.Unread {
 		query += " AND read = FALSE"
@@ -324,9 +324,9 @@ func (p *Provider) GetMailbox(ctx context.Context, namespace string, agentID str
 	}
 	defer rows.Close()
 
-	var result []agentstate.MailboxMessage
+	var result []hearsay.MailboxMessage
 	for rows.Next() {
-		var m agentstate.MailboxMessage
+		var m hearsay.MailboxMessage
 		if err := rows.Scan(&m.MessageID, &m.From, &m.To, &m.Type, &m.Content, &m.RelatedClaimID, &m.Read, &m.Archived, &m.CreatedAt, &m.ExpiresAt); err != nil {
 			return nil, err
 		}
@@ -356,7 +356,7 @@ func (p *Provider) ExpireMessages(ctx context.Context, namespace string, before 
 	return err
 }
 
-func (p *Provider) CreateTask(ctx context.Context, namespace string, task *agentstate.A2ATask) error {
+func (p *Provider) CreateTask(ctx context.Context, namespace string, task *hearsay.A2ATask) error {
 	_, err := p.db.ExecContext(ctx,
 		`INSERT INTO a2a_tasks (id, session_id, state, status_message, status_time, claim_id, namespace, metadata, created_at)
 		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
@@ -364,8 +364,8 @@ func (p *Provider) CreateTask(ctx context.Context, namespace string, task *agent
 	return err
 }
 
-func (p *Provider) GetTask(ctx context.Context, namespace string, taskID string) (*agentstate.A2ATask, error) {
-	var t agentstate.A2ATask
+func (p *Provider) GetTask(ctx context.Context, namespace string, taskID string) (*hearsay.A2ATask, error) {
+	var t hearsay.A2ATask
 	var statusMsg, metadata string
 	row := p.db.QueryRowContext(ctx,
 		`SELECT id, session_id, state, status_message, status_time, claim_id, namespace, metadata, created_at
@@ -379,7 +379,7 @@ func (p *Provider) GetTask(ctx context.Context, namespace string, taskID string)
 	return &t, nil
 }
 
-func (p *Provider) UpdateTask(ctx context.Context, namespace string, task *agentstate.A2ATask) error {
+func (p *Provider) UpdateTask(ctx context.Context, namespace string, task *hearsay.A2ATask) error {
 	_, err := p.db.ExecContext(ctx,
 		`UPDATE a2a_tasks SET session_id = ?, state = ?, status_message = ?, status_time = ?, claim_id = ?, metadata = ?
 		 WHERE namespace = ? AND id = ?`,
@@ -387,7 +387,7 @@ func (p *Provider) UpdateTask(ctx context.Context, namespace string, task *agent
 	return err
 }
 
-func (p *Provider) AppendTaskHistory(ctx context.Context, namespace string, taskID string, seq int, msg agentstate.A2AMessage) error {
+func (p *Provider) AppendTaskHistory(ctx context.Context, namespace string, taskID string, seq int, msg hearsay.A2AMessage) error {
 	_, err := p.db.ExecContext(ctx,
 		`INSERT INTO a2a_task_history (task_id, seq, role, parts, metadata, timestamp)
 		 VALUES (?, ?, ?, ?, ?, ?)`,
@@ -395,7 +395,7 @@ func (p *Provider) AppendTaskHistory(ctx context.Context, namespace string, task
 	return err
 }
 
-func (p *Provider) GetTaskHistory(ctx context.Context, namespace string, taskID string, limit int) ([]agentstate.A2AMessage, error) {
+func (p *Provider) GetTaskHistory(ctx context.Context, namespace string, taskID string, limit int) ([]hearsay.A2AMessage, error) {
 	query := `SELECT role, parts, metadata FROM a2a_task_history WHERE task_id = ? ORDER BY seq`
 	if limit > 0 {
 		query += fmt.Sprintf(" LIMIT %d", limit)
@@ -405,9 +405,9 @@ func (p *Provider) GetTaskHistory(ctx context.Context, namespace string, taskID 
 		return nil, err
 	}
 	defer rows.Close()
-	var out []agentstate.A2AMessage
+	var out []hearsay.A2AMessage
 	for rows.Next() {
-		var m agentstate.A2AMessage
+		var m hearsay.A2AMessage
 		var parts, metadata string
 		if err := rows.Scan(&m.Role, &parts, &metadata); err != nil {
 			return nil, err
@@ -419,7 +419,7 @@ func (p *Provider) GetTaskHistory(ctx context.Context, namespace string, taskID 
 	return out, rows.Err()
 }
 
-func (p *Provider) CreateArtifact(ctx context.Context, namespace string, taskID string, art agentstate.A2AArtifact) error {
+func (p *Provider) CreateArtifact(ctx context.Context, namespace string, taskID string, art hearsay.A2AArtifact) error {
 	_, err := p.db.ExecContext(ctx,
 		`INSERT INTO a2a_artifacts (task_id, name, description, parts, index_num, append, last_chunk, metadata, created_at)
 		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
@@ -427,7 +427,7 @@ func (p *Provider) CreateArtifact(ctx context.Context, namespace string, taskID 
 	return err
 }
 
-func (p *Provider) GetArtifacts(ctx context.Context, namespace string, taskID string) ([]agentstate.A2AArtifact, error) {
+func (p *Provider) GetArtifacts(ctx context.Context, namespace string, taskID string) ([]hearsay.A2AArtifact, error) {
 	rows, err := p.db.QueryContext(ctx,
 		`SELECT name, description, parts, index_num, append, last_chunk, metadata FROM a2a_artifacts WHERE task_id = ? ORDER BY name, index_num`,
 		taskID)
@@ -435,9 +435,9 @@ func (p *Provider) GetArtifacts(ctx context.Context, namespace string, taskID st
 		return nil, err
 	}
 	defer rows.Close()
-	var out []agentstate.A2AArtifact
+	var out []hearsay.A2AArtifact
 	for rows.Next() {
-		var a agentstate.A2AArtifact
+		var a hearsay.A2AArtifact
 		var parts, metadata string
 		if err := rows.Scan(&a.Name, &a.Description, &parts, &a.Index, &a.Append, &a.LastChunk, &metadata); err != nil {
 			return nil, err

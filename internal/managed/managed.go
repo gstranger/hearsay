@@ -9,11 +9,11 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/thunder/agentstate/pkg/agentstate"
+	"github.com/gstranger/hearsay/pkg/hearsay"
 )
 
-// Provider delegates all Provider operations to a remote agentstate HTTP API.
-// It is useful when agentstate is run as a hosted service.
+// Provider delegates all Provider operations to a remote hearsay HTTP API.
+// It is useful when hearsay is run as a hosted service.
 type Provider struct {
 	endpoint string
 	token    string
@@ -30,7 +30,7 @@ func New(endpoint, token string) *Provider {
 	}
 }
 
-func (p *Provider) CreateNamespace(ctx context.Context, ns agentstate.Namespace) error {
+func (p *Provider) CreateNamespace(ctx context.Context, ns hearsay.Namespace) error {
 	body, _ := json.Marshal(ns)
 	return p.post(ctx, "/namespaces/create", body)
 }
@@ -40,7 +40,7 @@ func (p *Provider) DeleteNamespace(ctx context.Context, namespaceID string) erro
 	return p.post(ctx, "/namespaces/delete", body)
 }
 
-func (p *Provider) Append(ctx context.Context, namespaceID string, msgs []agentstate.Message) error {
+func (p *Provider) Append(ctx context.Context, namespaceID string, msgs []hearsay.Message) error {
 	body, _ := json.Marshal(map[string]any{
 		"namespace": namespaceID,
 		"messages":  msgs,
@@ -48,7 +48,7 @@ func (p *Provider) Append(ctx context.Context, namespaceID string, msgs []agents
 	return p.post(ctx, "/append", body)
 }
 
-func (p *Provider) Query(ctx context.Context, namespaceID string, opts agentstate.QueryOpts) ([]agentstate.Message, error) {
+func (p *Provider) Query(ctx context.Context, namespaceID string, opts hearsay.QueryOpts) ([]hearsay.Message, error) {
 	q := fmt.Sprintf("%s/query?namespace=%s&since=%d", p.endpoint, namespaceID, opts.Since)
 	if opts.AgentID != "" {
 		q += "&agent=" + opts.AgentID
@@ -79,27 +79,27 @@ func (p *Provider) Query(ctx context.Context, namespaceID string, opts agentstat
 		body, _ := io.ReadAll(resp.Body)
 		return nil, fmt.Errorf("managed query: %s: %s", resp.Status, body)
 	}
-	var result []agentstate.Message
+	var result []hearsay.Message
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
 		return nil, err
 	}
 	return result, nil
 }
 
-func (p *Provider) Subscribe(ctx context.Context, namespaceID string, from agentstate.Offset) (<-chan agentstate.Message, error) {
-	ch := make(chan agentstate.Message, 100)
+func (p *Provider) Subscribe(ctx context.Context, namespaceID string, from hearsay.Offset) (<-chan hearsay.Message, error) {
+	ch := make(chan hearsay.Message, 100)
 	go func() {
 		defer close(ch)
 		current := from
 		for {
-			msgs, err := p.Query(ctx, namespaceID, agentstate.QueryOpts{Since: current})
+			msgs, err := p.Query(ctx, namespaceID, hearsay.QueryOpts{Since: current})
 			if err != nil {
 				return
 			}
 			for _, m := range msgs {
 				select {
 				case ch <- m:
-					current = agentstate.Offset(m.Offset)
+					current = hearsay.Offset(m.Offset)
 				case <-ctx.Done():
 					return
 				}
@@ -114,7 +114,7 @@ func (p *Provider) Subscribe(ctx context.Context, namespaceID string, from agent
 	return ch, nil
 }
 
-func (p *Provider) ActiveClaims(ctx context.Context, namespaceID string, resourcePattern string) ([]agentstate.Claim, error) {
+func (p *Provider) ActiveClaims(ctx context.Context, namespaceID string, resourcePattern string) ([]hearsay.Claim, error) {
 	url := fmt.Sprintf("%s/claims?namespace=%s&resource=%s", p.endpoint, namespaceID, resourcePattern)
 	resp, err := p.do(ctx, "GET", url, nil)
 	if err != nil {
@@ -125,27 +125,27 @@ func (p *Provider) ActiveClaims(ctx context.Context, namespaceID string, resourc
 		body, _ := io.ReadAll(resp.Body)
 		return nil, fmt.Errorf("managed claims: %s: %s", resp.Status, body)
 	}
-	var result []agentstate.Claim
+	var result []hearsay.Claim
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
 		return nil, err
 	}
 	return result, nil
 }
 
-func (p *Provider) AgentState(ctx context.Context, namespaceID string, agentID string) (agentstate.AgentState, error) {
+func (p *Provider) AgentState(ctx context.Context, namespaceID string, agentID string) (hearsay.AgentState, error) {
 	url := fmt.Sprintf("%s/agents?namespace=%s&agent=%s", p.endpoint, namespaceID, agentID)
 	resp, err := p.do(ctx, "GET", url, nil)
 	if err != nil {
-		return agentstate.AgentState{}, err
+		return hearsay.AgentState{}, err
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode >= 300 {
 		body, _ := io.ReadAll(resp.Body)
-		return agentstate.AgentState{}, fmt.Errorf("managed agentstate: %s: %s", resp.Status, body)
+		return hearsay.AgentState{}, fmt.Errorf("managed hearsay: %s: %s", resp.Status, body)
 	}
-	var result agentstate.AgentState
+	var result hearsay.AgentState
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		return agentstate.AgentState{}, err
+		return hearsay.AgentState{}, err
 	}
 	return result, nil
 }
@@ -155,7 +155,7 @@ func (p *Provider) ReleaseExpired(ctx context.Context, namespaceID string, befor
 	return p.post(ctx, "/expire", body)
 }
 
-func (p *Provider) SendMessage(ctx context.Context, namespace string, msg agentstate.MailboxMessage) error {
+func (p *Provider) SendMessage(ctx context.Context, namespace string, msg hearsay.MailboxMessage) error {
 	payload, err := json.Marshal(msg)
 	if err != nil {
 		return err
@@ -180,7 +180,7 @@ func (p *Provider) SendMessage(ctx context.Context, namespace string, msg agents
 	return nil
 }
 
-func (p *Provider) GetMailbox(ctx context.Context, namespace string, agentID string, opts agentstate.MailboxQueryOpts) ([]agentstate.MailboxMessage, error) {
+func (p *Provider) GetMailbox(ctx context.Context, namespace string, agentID string, opts hearsay.MailboxQueryOpts) ([]hearsay.MailboxMessage, error) {
 	url := fmt.Sprintf("%s/mailbox?namespace=%s&agent_id=%s", p.endpoint, namespace, agentID)
 	if opts.Unread {
 		url += "&unread=true"
@@ -200,7 +200,7 @@ func (p *Provider) GetMailbox(ctx context.Context, namespace string, agentID str
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("get mailbox failed: %d", resp.StatusCode)
 	}
-	var msgs []agentstate.MailboxMessage
+	var msgs []hearsay.MailboxMessage
 	if err := json.NewDecoder(resp.Body).Decode(&msgs); err != nil {
 		return nil, err
 	}
@@ -254,12 +254,12 @@ func (p *Provider) ExpireMessages(ctx context.Context, namespace string, before 
 	return nil
 }
 
-func (p *Provider) CreateTask(ctx context.Context, namespace string, task *agentstate.A2ATask) error {
+func (p *Provider) CreateTask(ctx context.Context, namespace string, task *hearsay.A2ATask) error {
 	body, _ := json.Marshal(map[string]any{"namespace": namespace, "task": task})
 	return p.post(ctx, "/tasks/create", body)
 }
 
-func (p *Provider) GetTask(ctx context.Context, namespace string, taskID string) (*agentstate.A2ATask, error) {
+func (p *Provider) GetTask(ctx context.Context, namespace string, taskID string) (*hearsay.A2ATask, error) {
 	url := fmt.Sprintf("%s/tasks/get?namespace=%s&id=%s", p.endpoint, namespace, taskID)
 	resp, err := p.do(ctx, "GET", url, nil)
 	if err != nil {
@@ -270,24 +270,24 @@ func (p *Provider) GetTask(ctx context.Context, namespace string, taskID string)
 		b, _ := io.ReadAll(resp.Body)
 		return nil, fmt.Errorf("managed get task: %s: %s", resp.Status, b)
 	}
-	var result agentstate.A2ATask
+	var result hearsay.A2ATask
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
 		return nil, err
 	}
 	return &result, nil
 }
 
-func (p *Provider) UpdateTask(ctx context.Context, namespace string, task *agentstate.A2ATask) error {
+func (p *Provider) UpdateTask(ctx context.Context, namespace string, task *hearsay.A2ATask) error {
 	body, _ := json.Marshal(map[string]any{"namespace": namespace, "task": task})
 	return p.post(ctx, "/tasks/update", body)
 }
 
-func (p *Provider) AppendTaskHistory(ctx context.Context, namespace string, taskID string, seq int, msg agentstate.A2AMessage) error {
+func (p *Provider) AppendTaskHistory(ctx context.Context, namespace string, taskID string, seq int, msg hearsay.A2AMessage) error {
 	body, _ := json.Marshal(map[string]any{"namespace": namespace, "task_id": taskID, "seq": seq, "message": msg})
 	return p.post(ctx, "/tasks/history", body)
 }
 
-func (p *Provider) GetTaskHistory(ctx context.Context, namespace string, taskID string, limit int) ([]agentstate.A2AMessage, error) {
+func (p *Provider) GetTaskHistory(ctx context.Context, namespace string, taskID string, limit int) ([]hearsay.A2AMessage, error) {
 	url := fmt.Sprintf("%s/tasks/history?namespace=%s&id=%s&limit=%d", p.endpoint, namespace, taskID, limit)
 	resp, err := p.do(ctx, "GET", url, nil)
 	if err != nil {
@@ -298,19 +298,19 @@ func (p *Provider) GetTaskHistory(ctx context.Context, namespace string, taskID 
 		b, _ := io.ReadAll(resp.Body)
 		return nil, fmt.Errorf("managed get task history: %s: %s", resp.Status, b)
 	}
-	var result []agentstate.A2AMessage
+	var result []hearsay.A2AMessage
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
 		return nil, err
 	}
 	return result, nil
 }
 
-func (p *Provider) CreateArtifact(ctx context.Context, namespace string, taskID string, art agentstate.A2AArtifact) error {
+func (p *Provider) CreateArtifact(ctx context.Context, namespace string, taskID string, art hearsay.A2AArtifact) error {
 	body, _ := json.Marshal(map[string]any{"namespace": namespace, "task_id": taskID, "artifact": art})
 	return p.post(ctx, "/tasks/artifact", body)
 }
 
-func (p *Provider) GetArtifacts(ctx context.Context, namespace string, taskID string) ([]agentstate.A2AArtifact, error) {
+func (p *Provider) GetArtifacts(ctx context.Context, namespace string, taskID string) ([]hearsay.A2AArtifact, error) {
 	url := fmt.Sprintf("%s/tasks/artifacts?namespace=%s&id=%s", p.endpoint, namespace, taskID)
 	resp, err := p.do(ctx, "GET", url, nil)
 	if err != nil {
@@ -321,7 +321,7 @@ func (p *Provider) GetArtifacts(ctx context.Context, namespace string, taskID st
 		b, _ := io.ReadAll(resp.Body)
 		return nil, fmt.Errorf("managed get artifacts: %s: %s", resp.Status, b)
 	}
-	var result []agentstate.A2AArtifact
+	var result []hearsay.A2AArtifact
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
 		return nil, err
 	}

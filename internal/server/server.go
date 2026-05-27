@@ -7,17 +7,17 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/thunder/agentstate/pkg/agentstate"
+	"github.com/gstranger/hearsay/pkg/hearsay"
 )
 
 type Server struct {
-	client   *agentstate.Client
-	provider agentstate.Provider
+	client   *hearsay.Client
+	provider hearsay.Provider
 	locking  bool
 	mux      *http.ServeMux
 }
 
-func New(client *agentstate.Client, provider agentstate.Provider, locking bool) *Server {
+func New(client *hearsay.Client, provider hearsay.Provider, locking bool) *Server {
 	s := &Server{client: client, provider: provider, locking: locking, mux: http.NewServeMux()}
 	// Health check
 	s.mux.HandleFunc("GET /health", func(w http.ResponseWriter, r *http.Request) {
@@ -51,7 +51,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleClaim(w http.ResponseWriter, r *http.Request) {
-	var req agentstate.ClaimRequest
+	var req hearsay.ClaimRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
@@ -59,7 +59,7 @@ func (s *Server) handleClaim(w http.ResponseWriter, r *http.Request) {
 
 	resp, err := s.client.Claim(r.Context(), req)
 	if err != nil {
-		if _, ok := err.(*agentstate.ConflictError); ok {
+		if _, ok := err.(*hearsay.ConflictError); ok {
 			if s.locking && resp.Conflict != nil && len(resp.Conflict.Conflicts) > 0 {
 				c := resp.Conflict.Conflicts[0]
 				w.Header().Set("Content-Type", "application/json")
@@ -90,7 +90,7 @@ func (s *Server) handleClaim(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleRelease(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		ClaimID string           `json:"claim_id"`
-		Outcome agentstate.Outcome `json:"outcome"`
+		Outcome hearsay.Outcome `json:"outcome"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
@@ -130,7 +130,7 @@ func (s *Server) handleQueryClaims(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleCheck(w http.ResponseWriter, r *http.Request) {
 	resource := r.URL.Query().Get("resource")
-	op := agentstate.Operation(r.URL.Query().Get("operation"))
+	op := hearsay.Operation(r.URL.Query().Get("operation"))
 	report, err := s.client.CheckConflict(r.Context(), resource, op)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -158,7 +158,7 @@ func (s *Server) handleIntent(w http.ResponseWriter, r *http.Request) {
 // Provider proxy handlers
 
 func (s *Server) handleCreateNamespace(w http.ResponseWriter, r *http.Request) {
-	var ns agentstate.Namespace
+	var ns hearsay.Namespace
 	if err := json.NewDecoder(r.Body).Decode(&ns); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
@@ -186,7 +186,7 @@ func (s *Server) handleDeleteNamespace(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleAppend(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		Namespace string              `json:"namespace"`
-		Messages  []agentstate.Message `json:"messages"`
+		Messages  []hearsay.Message `json:"messages"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
@@ -201,11 +201,11 @@ func (s *Server) handleAppend(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleQuery(w http.ResponseWriter, r *http.Request) {
 	namespace := r.URL.Query().Get("namespace")
-	opts := agentstate.QueryOpts{}
+	opts := hearsay.QueryOpts{}
 	sinceStr := r.URL.Query().Get("since")
 	if sinceStr != "" {
 		if v, err := strconv.ParseInt(sinceStr, 10, 64); err == nil {
-			opts.Since = agentstate.Offset(v)
+			opts.Since = hearsay.Offset(v)
 		}
 	}
 	opts.AgentID = r.URL.Query().Get("agent")

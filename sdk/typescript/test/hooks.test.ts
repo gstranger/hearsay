@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { createHooks, type HookOptions } from "../src/hooks.js";
-import { AgentstateClient } from "../src/client.js";
+import { HearsayClient } from "../src/client.js";
 
 describe("createHooks", () => {
   const mockClaim = vi.fn();

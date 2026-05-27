@@ -10,31 +10,31 @@ import (
 	"testing"
 	"time"
 
-	"github.com/thunder/agentstate/internal"
-	"github.com/thunder/agentstate/pkg/agentstate"
+	"github.com/gstranger/hearsay/internal"
+	"github.com/gstranger/hearsay/pkg/hearsay"
 )
 
-// mockManagedServer implements the hosted-agentstate HTTP API that the
+// mockManagedServer implements the hosted-hearsay HTTP API that the
 // managed provider expects.  It stores state in-memory.
 type mockManagedServer struct {
 	mu         sync.Mutex
 	namespaces map[string]struct{}
-	messages   map[string][]agentstate.Message // ns -> msgs
-	tasks      map[string]map[string]*agentstate.A2ATask // ns -> taskID -> task
+	messages   map[string][]hearsay.Message // ns -> msgs
+	tasks      map[string]map[string]*hearsay.A2ATask // ns -> taskID -> task
 }
 
 func newMockManagedServer() *mockManagedServer {
 	return &mockManagedServer{
 		namespaces: make(map[string]struct{}),
-		messages:   make(map[string][]agentstate.Message),
-		tasks:      make(map[string]map[string]*agentstate.A2ATask),
+		messages:   make(map[string][]hearsay.Message),
+		tasks:      make(map[string]map[string]*hearsay.A2ATask),
 	}
 }
 
 func (m *mockManagedServer) handler() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("POST /namespaces/create", func(w http.ResponseWriter, r *http.Request) {
-		var ns agentstate.Namespace
+		var ns hearsay.Namespace
 		json.NewDecoder(r.Body).Decode(&ns)
 		m.mu.Lock()
 		m.namespaces[ns.ID] = struct{}{}
@@ -55,7 +55,7 @@ func (m *mockManagedServer) handler() http.Handler {
 	mux.HandleFunc("POST /append", func(w http.ResponseWriter, r *http.Request) {
 		var req struct {
 			Namespace string               `json:"namespace"`
-			Messages  []agentstate.Message `json:"messages"`
+			Messages  []hearsay.Message `json:"messages"`
 		}
 		json.NewDecoder(r.Body).Decode(&req)
 		m.mu.Lock()
@@ -80,7 +80,7 @@ func (m *mockManagedServer) handler() http.Handler {
 		msgs := m.messages[ns]
 		m.mu.Unlock()
 
-		var result []agentstate.Message
+		var result []hearsay.Message
 		for _, msg := range msgs {
 			if int(msg.Offset) <= since {
 				continue
@@ -102,8 +102,8 @@ func (m *mockManagedServer) handler() http.Handler {
 		msgs := m.messages[ns]
 		m.mu.Unlock()
 
-		var active []agentstate.Claim
-		for _, c := range agentstate.FilterActiveClaims(msgs) {
+		var active []hearsay.Claim
+		for _, c := range hearsay.FilterActiveClaims(msgs) {
 			active = append(active, c)
 		}
 		w.Header().Set("Content-Type", "application/json")
@@ -122,13 +122,13 @@ func (m *mockManagedServer) handler() http.Handler {
 			if m.AgentID == agentID && m.Timestamp.After(lastSeen) {
 				lastSeen = m.Timestamp
 			}
-			if m.Type == agentstate.MsgClaim && m.AgentID == agentID {
-				var c agentstate.Claim
+			if m.Type == hearsay.MsgClaim && m.AgentID == agentID {
+				var c hearsay.Claim
 				json.Unmarshal(m.Payload, &c)
 				active = append(active, c.ClaimID)
 			}
 		}
-		state := agentstate.AgentState{AgentID: agentID, ActiveClaims: active, LastSeen: lastSeen}
+		state := hearsay.AgentState{AgentID: agentID, ActiveClaims: active, LastSeen: lastSeen}
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(state)
 	})
@@ -140,12 +140,12 @@ func (m *mockManagedServer) handler() http.Handler {
 	mux.HandleFunc("POST /tasks/create", func(w http.ResponseWriter, r *http.Request) {
 		var req struct {
 			Namespace string                `json:"namespace"`
-			Task      *agentstate.A2ATask   `json:"task"`
+			Task      *hearsay.A2ATask   `json:"task"`
 		}
 		json.NewDecoder(r.Body).Decode(&req)
 		m.mu.Lock()
 		if m.tasks[req.Namespace] == nil {
-			m.tasks[req.Namespace] = make(map[string]*agentstate.A2ATask)
+			m.tasks[req.Namespace] = make(map[string]*hearsay.A2ATask)
 		}
 		m.tasks[req.Namespace][req.Task.ID] = req.Task
 		m.mu.Unlock()
@@ -167,12 +167,12 @@ func (m *mockManagedServer) handler() http.Handler {
 	mux.HandleFunc("POST /tasks/update", func(w http.ResponseWriter, r *http.Request) {
 		var req struct {
 			Namespace string                `json:"namespace"`
-			Task      *agentstate.A2ATask   `json:"task"`
+			Task      *hearsay.A2ATask   `json:"task"`
 		}
 		json.NewDecoder(r.Body).Decode(&req)
 		m.mu.Lock()
 		if m.tasks[req.Namespace] == nil {
-			m.tasks[req.Namespace] = make(map[string]*agentstate.A2ATask)
+			m.tasks[req.Namespace] = make(map[string]*hearsay.A2ATask)
 		}
 		m.tasks[req.Namespace][req.Task.ID] = req.Task
 		m.mu.Unlock()
@@ -183,14 +183,14 @@ func (m *mockManagedServer) handler() http.Handler {
 	})
 	mux.HandleFunc("GET /tasks/history", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode([]agentstate.A2AMessage{})
+		json.NewEncoder(w).Encode([]hearsay.A2AMessage{})
 	})
 	mux.HandleFunc("POST /tasks/artifact", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	})
 	mux.HandleFunc("GET /tasks/artifacts", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode([]agentstate.A2AArtifact{})
+		json.NewEncoder(w).Encode([]hearsay.A2AArtifact{})
 	})
 	return mux
 }
@@ -202,7 +202,7 @@ func TestManagedProviderContract(t *testing.T) {
 
 	p := New(ts.URL, "")
 
-	internal.RunProviderContractTests(t, "managed", func() (agentstate.Provider, error) {
+	internal.RunProviderContractTests(t, "managed", func() (hearsay.Provider, error) {
 		return p, nil
 	})
 }
@@ -222,7 +222,7 @@ func TestManagedProviderWithToken(t *testing.T) {
 	p := New(ts.URL, "sekret-token")
 	ctx := context.Background()
 	_ = p.DeleteNamespace(ctx, "token-test")
-	if err := p.CreateNamespace(ctx, agentstate.Namespace{ID: "token-test", CreatedAt: time.Now()}); err != nil {
+	if err := p.CreateNamespace(ctx, hearsay.Namespace{ID: "token-test", CreatedAt: time.Now()}); err != nil {
 		t.Fatalf("create namespace: %v", err)
 	}
 	if receivedToken != "Bearer sekret-token" {

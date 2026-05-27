@@ -7,33 +7,33 @@ import (
 	"sync"
 	"time"
 
-	"github.com/thunder/agentstate/pkg/agentstate"
+	"github.com/gstranger/hearsay/pkg/hearsay"
 )
 
 type Provider struct {
 	mu              sync.RWMutex
-	namespaces      map[string]agentstate.Namespace
-	messages        map[string][]agentstate.Message
-	offsets         map[string]agentstate.Offset
-	mailboxMessages map[string][]agentstate.MailboxMessage
-	a2aTasks        map[string]*agentstate.A2ATask
-	a2aHistory      map[string][]agentstate.A2AMessage
-	a2aArtifacts    map[string][]agentstate.A2AArtifact
+	namespaces      map[string]hearsay.Namespace
+	messages        map[string][]hearsay.Message
+	offsets         map[string]hearsay.Offset
+	mailboxMessages map[string][]hearsay.MailboxMessage
+	a2aTasks        map[string]*hearsay.A2ATask
+	a2aHistory      map[string][]hearsay.A2AMessage
+	a2aArtifacts    map[string][]hearsay.A2AArtifact
 }
 
 func New() *Provider {
 	return &Provider{
-		namespaces:      make(map[string]agentstate.Namespace),
-		messages:        make(map[string][]agentstate.Message),
-		offsets:         make(map[string]agentstate.Offset),
-		mailboxMessages: make(map[string][]agentstate.MailboxMessage),
-		a2aTasks:        make(map[string]*agentstate.A2ATask),
-		a2aHistory:      make(map[string][]agentstate.A2AMessage),
-		a2aArtifacts:    make(map[string][]agentstate.A2AArtifact),
+		namespaces:      make(map[string]hearsay.Namespace),
+		messages:        make(map[string][]hearsay.Message),
+		offsets:         make(map[string]hearsay.Offset),
+		mailboxMessages: make(map[string][]hearsay.MailboxMessage),
+		a2aTasks:        make(map[string]*hearsay.A2ATask),
+		a2aHistory:      make(map[string][]hearsay.A2AMessage),
+		a2aArtifacts:    make(map[string][]hearsay.A2AArtifact),
 	}
 }
 
-func (p *Provider) CreateNamespace(ctx context.Context, ns agentstate.Namespace) error {
+func (p *Provider) CreateNamespace(ctx context.Context, ns hearsay.Namespace) error {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	if _, ok := p.namespaces[ns.ID]; ok {
@@ -62,7 +62,7 @@ func (p *Provider) DeleteNamespace(ctx context.Context, namespaceID string) erro
 	return nil
 }
 
-func (p *Provider) Append(ctx context.Context, namespaceID string, msgs []agentstate.Message) error {
+func (p *Provider) Append(ctx context.Context, namespaceID string, msgs []hearsay.Message) error {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	for i := range msgs {
@@ -75,11 +75,11 @@ func (p *Provider) Append(ctx context.Context, namespaceID string, msgs []agents
 	return nil
 }
 
-func (p *Provider) Query(ctx context.Context, namespaceID string, opts agentstate.QueryOpts) ([]agentstate.Message, error) {
+func (p *Provider) Query(ctx context.Context, namespaceID string, opts hearsay.QueryOpts) ([]hearsay.Message, error) {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
 	msgs := p.messages[namespaceID]
-	var result []agentstate.Message
+	var result []hearsay.Message
 	for _, m := range msgs {
 		if m.Offset <= int64(opts.Since) {
 			continue
@@ -98,16 +98,16 @@ func (p *Provider) Query(ctx context.Context, namespaceID string, opts agentstat
 	return result, nil
 }
 
-func (p *Provider) Subscribe(ctx context.Context, namespaceID string, from agentstate.Offset) (<-chan agentstate.Message, error) {
-	ch := make(chan agentstate.Message, 100)
+func (p *Provider) Subscribe(ctx context.Context, namespaceID string, from hearsay.Offset) (<-chan hearsay.Message, error) {
+	ch := make(chan hearsay.Message, 100)
 	go func() {
 		defer close(ch)
 		for {
-			msgs, _ := p.Query(ctx, namespaceID, agentstate.QueryOpts{Since: from})
+			msgs, _ := p.Query(ctx, namespaceID, hearsay.QueryOpts{Since: from})
 			for _, m := range msgs {
 				select {
 				case ch <- m:
-					from = agentstate.Offset(m.Offset)
+					from = hearsay.Offset(m.Offset)
 				case <-ctx.Done():
 					return
 				}
@@ -122,24 +122,24 @@ func (p *Provider) Subscribe(ctx context.Context, namespaceID string, from agent
 	return ch, nil
 }
 
-func (p *Provider) ActiveClaims(ctx context.Context, namespaceID string, resourcePattern string) ([]agentstate.Claim, error) {
-	msgs, err := p.Query(ctx, namespaceID, agentstate.QueryOpts{})
+func (p *Provider) ActiveClaims(ctx context.Context, namespaceID string, resourcePattern string) ([]hearsay.Claim, error) {
+	msgs, err := p.Query(ctx, namespaceID, hearsay.QueryOpts{})
 	if err != nil {
 		return nil, err
 	}
-	var result []agentstate.Claim
-	for _, c := range agentstate.FilterActiveClaims(msgs) {
-		if agentstate.ResourceMatchesPattern(resourcePattern, c.ResourceURI) {
+	var result []hearsay.Claim
+	for _, c := range hearsay.FilterActiveClaims(msgs) {
+		if hearsay.ResourceMatchesPattern(resourcePattern, c.ResourceURI) {
 			result = append(result, c)
 		}
 	}
 	return result, nil
 }
 
-func (p *Provider) AgentState(ctx context.Context, namespaceID string, agentID string) (agentstate.AgentState, error) {
-	msgs, err := p.Query(ctx, namespaceID, agentstate.QueryOpts{})
+func (p *Provider) AgentState(ctx context.Context, namespaceID string, agentID string) (hearsay.AgentState, error) {
+	msgs, err := p.Query(ctx, namespaceID, hearsay.QueryOpts{})
 	if err != nil {
-		return agentstate.AgentState{}, err
+		return hearsay.AgentState{}, err
 	}
 	var active []string
 	var lastSeen time.Time
@@ -148,19 +148,19 @@ func (p *Provider) AgentState(ctx context.Context, namespaceID string, agentID s
 			lastSeen = m.Timestamp
 		}
 	}
-	for _, c := range agentstate.FilterActiveClaims(msgs) {
+	for _, c := range hearsay.FilterActiveClaims(msgs) {
 		if c.AgentID == agentID {
 			active = append(active, c.ClaimID)
 		}
 	}
-	return agentstate.AgentState{AgentID: agentID, ActiveClaims: active, LastSeen: lastSeen}, nil
+	return hearsay.AgentState{AgentID: agentID, ActiveClaims: active, LastSeen: lastSeen}, nil
 }
 
 func (p *Provider) ReleaseExpired(ctx context.Context, namespaceID string, before time.Time) error {
 	return nil // no-op for in-memory; ActiveClaims filters expired claims on read
 }
 
-func (p *Provider) SendMessage(ctx context.Context, namespace string, msg agentstate.MailboxMessage) error {
+func (p *Provider) SendMessage(ctx context.Context, namespace string, msg hearsay.MailboxMessage) error {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	if msg.CreatedAt.IsZero() {
@@ -173,17 +173,17 @@ func (p *Provider) SendMessage(ctx context.Context, namespace string, msg agents
 	return nil
 }
 
-func (p *Provider) GetMailbox(ctx context.Context, namespace string, agentID string, opts agentstate.MailboxQueryOpts) ([]agentstate.MailboxMessage, error) {
+func (p *Provider) GetMailbox(ctx context.Context, namespace string, agentID string, opts hearsay.MailboxQueryOpts) ([]hearsay.MailboxMessage, error) {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
 
-	var result []agentstate.MailboxMessage
+	var result []hearsay.MailboxMessage
 	now := time.Now().UTC()
 	for _, m := range p.mailboxMessages[namespace] {
 		if m.Archived || m.ExpiresAt.Before(now) {
 			continue
 		}
-		if m.To != agentID && m.To != agentstate.MailboxToBroadcast {
+		if m.To != agentID && m.To != hearsay.MailboxToBroadcast {
 			continue
 		}
 		if opts.Unread && m.Read {
@@ -229,7 +229,7 @@ func (p *Provider) ArchiveMessage(ctx context.Context, namespace string, message
 func (p *Provider) ExpireMessages(ctx context.Context, namespace string, before time.Time) error {
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	var kept []agentstate.MailboxMessage
+	var kept []hearsay.MailboxMessage
 	for _, m := range p.mailboxMessages[namespace] {
 		if !m.ExpiresAt.Before(before) {
 			kept = append(kept, m)
@@ -240,7 +240,7 @@ func (p *Provider) ExpireMessages(ctx context.Context, namespace string, before 
 }
 
 // A2A task storage — in-memory provider (for tests)
-func (p *Provider) CreateTask(ctx context.Context, namespace string, task *agentstate.A2ATask) error {
+func (p *Provider) CreateTask(ctx context.Context, namespace string, task *hearsay.A2ATask) error {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	key := namespace + "/" + task.ID
@@ -252,7 +252,7 @@ func (p *Provider) CreateTask(ctx context.Context, namespace string, task *agent
 	return nil
 }
 
-func (p *Provider) GetTask(ctx context.Context, namespace string, taskID string) (*agentstate.A2ATask, error) {
+func (p *Provider) GetTask(ctx context.Context, namespace string, taskID string) (*hearsay.A2ATask, error) {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
 	key := namespace + "/" + taskID
@@ -264,7 +264,7 @@ func (p *Provider) GetTask(ctx context.Context, namespace string, taskID string)
 	return &t, nil
 }
 
-func (p *Provider) UpdateTask(ctx context.Context, namespace string, task *agentstate.A2ATask) error {
+func (p *Provider) UpdateTask(ctx context.Context, namespace string, task *hearsay.A2ATask) error {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	key := namespace + "/" + task.ID
@@ -276,7 +276,7 @@ func (p *Provider) UpdateTask(ctx context.Context, namespace string, task *agent
 	return nil
 }
 
-func (p *Provider) AppendTaskHistory(ctx context.Context, namespace string, taskID string, seq int, msg agentstate.A2AMessage) error {
+func (p *Provider) AppendTaskHistory(ctx context.Context, namespace string, taskID string, seq int, msg hearsay.A2AMessage) error {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	key := namespace + "/" + taskID
@@ -284,7 +284,7 @@ func (p *Provider) AppendTaskHistory(ctx context.Context, namespace string, task
 	return nil
 }
 
-func (p *Provider) GetTaskHistory(ctx context.Context, namespace string, taskID string, limit int) ([]agentstate.A2AMessage, error) {
+func (p *Provider) GetTaskHistory(ctx context.Context, namespace string, taskID string, limit int) ([]hearsay.A2AMessage, error) {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
 	key := namespace + "/" + taskID
@@ -292,12 +292,12 @@ func (p *Provider) GetTaskHistory(ctx context.Context, namespace string, taskID 
 	if limit > 0 && len(hist) > limit {
 		hist = hist[:limit]
 	}
-	out := make([]agentstate.A2AMessage, len(hist))
+	out := make([]hearsay.A2AMessage, len(hist))
 	copy(out, hist)
 	return out, nil
 }
 
-func (p *Provider) CreateArtifact(ctx context.Context, namespace string, taskID string, art agentstate.A2AArtifact) error {
+func (p *Provider) CreateArtifact(ctx context.Context, namespace string, taskID string, art hearsay.A2AArtifact) error {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	key := namespace + "/" + taskID
@@ -305,17 +305,17 @@ func (p *Provider) CreateArtifact(ctx context.Context, namespace string, taskID 
 	return nil
 }
 
-func (p *Provider) GetArtifacts(ctx context.Context, namespace string, taskID string) ([]agentstate.A2AArtifact, error) {
+func (p *Provider) GetArtifacts(ctx context.Context, namespace string, taskID string) ([]hearsay.A2AArtifact, error) {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
 	key := namespace + "/" + taskID
 	arts := p.a2aArtifacts[key]
-	out := make([]agentstate.A2AArtifact, len(arts))
+	out := make([]hearsay.A2AArtifact, len(arts))
 	copy(out, arts)
 	return out, nil
 }
 
-func containsType(types []agentstate.MessageType, t agentstate.MessageType) bool {
+func containsType(types []hearsay.MessageType, t hearsay.MessageType) bool {
 	for _, tt := range types {
 		if tt == t {
 			return true

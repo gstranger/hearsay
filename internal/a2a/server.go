@@ -4,18 +4,18 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"github.com/thunder/agentstate/pkg/agentstate"
+	"github.com/gstranger/hearsay/pkg/hearsay"
 )
 
 type Server struct {
-	cfg       *agentstate.A2AConfig
-	client    *agentstate.Client
-	provider  agentstate.Provider
+	cfg       *hearsay.A2AConfig
+	client    *hearsay.Client
+	provider  hearsay.Provider
 	auth      *AuthMiddleware
 	namespace string
 }
 
-func NewServer(cfg *agentstate.A2AConfig, client *agentstate.Client, provider agentstate.Provider, auth *AuthMiddleware, namespace string) *Server {
+func NewServer(cfg *hearsay.A2AConfig, client *hearsay.Client, provider hearsay.Provider, auth *AuthMiddleware, namespace string) *Server {
 	return &Server{cfg: cfg, client: client, provider: provider, auth: auth, namespace: namespace}
 }
 

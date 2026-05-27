@@ -1,4 +1,4 @@
-# A2A Adapter for agentstate — Design Document
+# A2A Adapter for hearsay — Design Document
 
 > Date: 2026-05-26  
 > Status: Approved  
@@ -8,9 +8,9 @@
 
 ## 1. Purpose
 
-Make agentstate discoverable and usable by any A2A-compatible agent. External agents (LangChain, CrewAI, Google ADK, custom agents) can discover agentstate via its Agent Card, delegate resource coordination tasks to it, and receive results through standard A2A JSON-RPC 2.0 over HTTP.
+Make hearsay discoverable and usable by any A2A-compatible agent. External agents (LangChain, CrewAI, Google ADK, custom agents) can discover hearsay via its Agent Card, delegate resource coordination tasks to it, and receive results through standard A2A JSON-RPC 2.0 over HTTP.
 
-This is **not** a rewrite of agentstate. The existing REST API, CLI, Cursor integration, TypeScript SDK, and filesystem watcher remain untouched. The A2A layer is additive.
+This is **not** a rewrite of hearsay. The existing REST API, CLI, Cursor integration, TypeScript SDK, and filesystem watcher remain untouched. The A2A layer is additive.
 
 ---
 
@@ -20,7 +20,7 @@ This is **not** a rewrite of agentstate. The existing REST API, CLI, Cursor inte
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                    agentstate serve                          │
+│                    hearsay serve                          │
 │                                                              │
 │  ┌─────────────────┐      ┌─────────────────────────────┐  │
 │  │  REST Server    │      │  A2A Server                 │  │
@@ -70,7 +70,7 @@ internal/a2a/
 ├── task_store.go   # Task persistence via Provider interface additions
 ├── agentcard.go    # Agent Card generation (static skills, dynamic capabilities)
 ├── auth.go         # Auth middleware: API key + Bearer with pluggable validator
-├── mapper.go       # Maps A2A task params ↔ agentstate ClaimRequest/Release/etc
+├── mapper.go       # Maps A2A task params ↔ hearsay ClaimRequest/Release/etc
 ├── handler_tasks.go # Task method handlers
 └── handler_skills.go # Skill execution logic (claim, release, check, mailbox)
 ```
@@ -196,7 +196,7 @@ type Task struct {
     Artifacts []Artifact
     Metadata  map[string]any
 
-    // Internal: maps to agentstate
+    // Internal: maps to hearsay
     ClaimID   string
     Namespace string
 }
@@ -414,7 +414,7 @@ Only one Bearer validator can be active. If both `bearer_validator_url` and `bea
 ### 9.1 `tasks/send` — Claim Resource
 
 ```
-A2A Client                     A2A Server                    agentstate Core
+A2A Client                     A2A Server                    hearsay Core
     |                              |                              |
     |-- POST / (tasks/send) ------> |                              |
     |   { skill: claim_resource }  |                              |
@@ -429,7 +429,7 @@ A2A Client                     A2A Server                    agentstate Core
 ### 9.2 `tasks/cancel` — Active Claim
 
 ```
-A2A Client                     A2A Server                    agentstate Core
+A2A Client                     A2A Server                    hearsay Core
     |                              |                              |
     |-- POST / (tasks/cancel) ---> |                              |
     |                              |-- lookup Task by ID -------->|
@@ -471,7 +471,7 @@ A2A Client                     A2A Server                    agentstate Core
 
 ### 11.2 Integration Tests
 
-- Spin up `agentstate serve --a2a-addr :8081` with SQLite
+- Spin up `hearsay serve --a2a-addr :8081` with SQLite
 - Send JSON-RPC requests via HTTP client
 - Verify Agent Card, task lifecycle, claim→conflict→release flow
 - Test auth rejection with bad API key / Bearer token
@@ -487,7 +487,7 @@ A2A Client                     A2A Server                    agentstate Core
 ### 12.1 New Flags for `serve`
 
 ```
-agentstate serve \
+hearsay serve \
   --addr localhost:8080 \
   --a2a-addr localhost:8081 \
   --a2a-api-key ak_live_xxx \

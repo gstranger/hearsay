@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/thunder/agentstate/pkg/agentstate"
+	"github.com/gstranger/hearsay/pkg/hearsay"
 )
 
 func TestProvider_CreateNamespace(t *testing.T) {
@@ -15,7 +15,7 @@ func TestProvider_CreateNamespace(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := p.CreateNamespace(ctx, agentstate.Namespace{ID: "test"}); err != nil {
+	if err := p.CreateNamespace(ctx, hearsay.Namespace{ID: "test"}); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -26,14 +26,14 @@ func TestProvider_AppendAndQuery(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	p.CreateNamespace(ctx, agentstate.Namespace{ID: "test"})
+	p.CreateNamespace(ctx, hearsay.Namespace{ID: "test"})
 
-	msg := agentstate.Message{Type: agentstate.MsgClaim, AgentID: "a1", Payload: []byte(`{"claim_id":"c1"}`)}
-	if err := p.Append(ctx, "test", []agentstate.Message{msg}); err != nil {
+	msg := hearsay.Message{Type: hearsay.MsgClaim, AgentID: "a1", Payload: []byte(`{"claim_id":"c1"}`)}
+	if err := p.Append(ctx, "test", []hearsay.Message{msg}); err != nil {
 		t.Fatal(err)
 	}
 
-	msgs, err := p.Query(ctx, "test", agentstate.QueryOpts{})
+	msgs, err := p.Query(ctx, "test", hearsay.QueryOpts{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -48,11 +48,11 @@ func TestProvider_ActiveClaims(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	p.CreateNamespace(ctx, agentstate.Namespace{ID: "test"})
+	p.CreateNamespace(ctx, hearsay.Namespace{ID: "test"})
 
-	claim := agentstate.Claim{ClaimID: "c1", AgentID: "a1", ResourceURI: "file://x.ts", Operation: agentstate.OpWrite, TTLSeconds: 300, CreatedAt: time.Now()}
+	claim := hearsay.Claim{ClaimID: "c1", AgentID: "a1", ResourceURI: "file://x.ts", Operation: hearsay.OpWrite, TTLSeconds: 300, CreatedAt: time.Now()}
 	payload, _ := json.Marshal(claim)
-	p.Append(ctx, "test", []agentstate.Message{{Type: agentstate.MsgClaim, AgentID: "a1", Payload: payload}})
+	p.Append(ctx, "test", []hearsay.Message{{Type: hearsay.MsgClaim, AgentID: "a1", Payload: payload}})
 
 	claims, err := p.ActiveClaims(ctx, "test", "file://x.ts")
 	if err != nil {
@@ -69,22 +69,22 @@ func TestSendMessage(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := p.CreateNamespace(ctx, agentstate.Namespace{ID: "ns1"}); err != nil {
+	if err := p.CreateNamespace(ctx, hearsay.Namespace{ID: "ns1"}); err != nil {
 		t.Fatal(err)
 	}
 
-	msg := agentstate.MailboxMessage{
+	msg := hearsay.MailboxMessage{
 		MessageID: "m1",
 		From:      "a1",
 		To:        "a2",
-		Type:      agentstate.MailboxTypeNote,
+		Type:      hearsay.MailboxTypeNote,
 		Content:   "hello",
 	}
 	if err := p.SendMessage(ctx, "ns1", msg); err != nil {
 		t.Fatal(err)
 	}
 
-	msgs, err := p.GetMailbox(ctx, "ns1", "a2", agentstate.MailboxQueryOpts{})
+	msgs, err := p.GetMailbox(ctx, "ns1", "a2", hearsay.MailboxQueryOpts{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -102,15 +102,15 @@ func TestGetMailbox(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := p.CreateNamespace(ctx, agentstate.Namespace{ID: "ns1"}); err != nil {
+	if err := p.CreateNamespace(ctx, hearsay.Namespace{ID: "ns1"}); err != nil {
 		t.Fatal(err)
 	}
 
-	_ = p.SendMessage(ctx, "ns1", agentstate.MailboxMessage{MessageID: "m1", From: "a1", To: "a2", Type: agentstate.MailboxTypeNote, Content: "c1", CreatedAt: time.Now().UTC(), ExpiresAt: time.Now().UTC().Add(time.Hour)})
-	_ = p.SendMessage(ctx, "ns1", agentstate.MailboxMessage{MessageID: "m2", From: "a2", To: "a3", Type: agentstate.MailboxTypeNote, Content: "c2", CreatedAt: time.Now().UTC(), ExpiresAt: time.Now().UTC().Add(time.Hour)})
-	_ = p.SendMessage(ctx, "ns1", agentstate.MailboxMessage{MessageID: "m3", From: "a1", To: "broadcast", Type: agentstate.MailboxTypeNote, Content: "c3", CreatedAt: time.Now().UTC(), ExpiresAt: time.Now().UTC().Add(time.Hour)})
+	_ = p.SendMessage(ctx, "ns1", hearsay.MailboxMessage{MessageID: "m1", From: "a1", To: "a2", Type: hearsay.MailboxTypeNote, Content: "c1", CreatedAt: time.Now().UTC(), ExpiresAt: time.Now().UTC().Add(time.Hour)})
+	_ = p.SendMessage(ctx, "ns1", hearsay.MailboxMessage{MessageID: "m2", From: "a2", To: "a3", Type: hearsay.MailboxTypeNote, Content: "c2", CreatedAt: time.Now().UTC(), ExpiresAt: time.Now().UTC().Add(time.Hour)})
+	_ = p.SendMessage(ctx, "ns1", hearsay.MailboxMessage{MessageID: "m3", From: "a1", To: "broadcast", Type: hearsay.MailboxTypeNote, Content: "c3", CreatedAt: time.Now().UTC(), ExpiresAt: time.Now().UTC().Add(time.Hour)})
 
-	msgs, err := p.GetMailbox(ctx, "ns1", "a2", agentstate.MailboxQueryOpts{})
+	msgs, err := p.GetMailbox(ctx, "ns1", "a2", hearsay.MailboxQueryOpts{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -125,15 +125,15 @@ func TestGetMailbox_UnreadFilter(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := p.CreateNamespace(ctx, agentstate.Namespace{ID: "ns1"}); err != nil {
+	if err := p.CreateNamespace(ctx, hearsay.Namespace{ID: "ns1"}); err != nil {
 		t.Fatal(err)
 	}
 
-	_ = p.SendMessage(ctx, "ns1", agentstate.MailboxMessage{MessageID: "m1", From: "a1", To: "a2", Type: agentstate.MailboxTypeNote, Content: "c1", CreatedAt: time.Now().UTC(), ExpiresAt: time.Now().UTC().Add(time.Hour)})
-	_ = p.SendMessage(ctx, "ns1", agentstate.MailboxMessage{MessageID: "m2", From: "a1", To: "a2", Type: agentstate.MailboxTypeNote, Content: "c2", CreatedAt: time.Now().UTC(), ExpiresAt: time.Now().UTC().Add(time.Hour)})
+	_ = p.SendMessage(ctx, "ns1", hearsay.MailboxMessage{MessageID: "m1", From: "a1", To: "a2", Type: hearsay.MailboxTypeNote, Content: "c1", CreatedAt: time.Now().UTC(), ExpiresAt: time.Now().UTC().Add(time.Hour)})
+	_ = p.SendMessage(ctx, "ns1", hearsay.MailboxMessage{MessageID: "m2", From: "a1", To: "a2", Type: hearsay.MailboxTypeNote, Content: "c2", CreatedAt: time.Now().UTC(), ExpiresAt: time.Now().UTC().Add(time.Hour)})
 	_ = p.MarkRead(ctx, "ns1", "m1")
 
-	msgs, err := p.GetMailbox(ctx, "ns1", "a2", agentstate.MailboxQueryOpts{Unread: true})
+	msgs, err := p.GetMailbox(ctx, "ns1", "a2", hearsay.MailboxQueryOpts{Unread: true})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -151,16 +151,16 @@ func TestMarkRead(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := p.CreateNamespace(ctx, agentstate.Namespace{ID: "ns1"}); err != nil {
+	if err := p.CreateNamespace(ctx, hearsay.Namespace{ID: "ns1"}); err != nil {
 		t.Fatal(err)
 	}
 
-	_ = p.SendMessage(ctx, "ns1", agentstate.MailboxMessage{MessageID: "m1", From: "a1", To: "a2", Type: agentstate.MailboxTypeNote, Content: "c1", CreatedAt: time.Now().UTC(), ExpiresAt: time.Now().UTC().Add(time.Hour)})
+	_ = p.SendMessage(ctx, "ns1", hearsay.MailboxMessage{MessageID: "m1", From: "a1", To: "a2", Type: hearsay.MailboxTypeNote, Content: "c1", CreatedAt: time.Now().UTC(), ExpiresAt: time.Now().UTC().Add(time.Hour)})
 	if err := p.MarkRead(ctx, "ns1", "m1"); err != nil {
 		t.Fatal(err)
 	}
 
-	msgs, err := p.GetMailbox(ctx, "ns1", "a2", agentstate.MailboxQueryOpts{Unread: true})
+	msgs, err := p.GetMailbox(ctx, "ns1", "a2", hearsay.MailboxQueryOpts{Unread: true})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -175,16 +175,16 @@ func TestArchiveMessage(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := p.CreateNamespace(ctx, agentstate.Namespace{ID: "ns1"}); err != nil {
+	if err := p.CreateNamespace(ctx, hearsay.Namespace{ID: "ns1"}); err != nil {
 		t.Fatal(err)
 	}
 
-	_ = p.SendMessage(ctx, "ns1", agentstate.MailboxMessage{MessageID: "m1", From: "a1", To: "a2", Type: agentstate.MailboxTypeNote, Content: "c1", CreatedAt: time.Now().UTC(), ExpiresAt: time.Now().UTC().Add(time.Hour)})
+	_ = p.SendMessage(ctx, "ns1", hearsay.MailboxMessage{MessageID: "m1", From: "a1", To: "a2", Type: hearsay.MailboxTypeNote, Content: "c1", CreatedAt: time.Now().UTC(), ExpiresAt: time.Now().UTC().Add(time.Hour)})
 	if err := p.ArchiveMessage(ctx, "ns1", "m1"); err != nil {
 		t.Fatal(err)
 	}
 
-	msgs, err := p.GetMailbox(ctx, "ns1", "a2", agentstate.MailboxQueryOpts{})
+	msgs, err := p.GetMailbox(ctx, "ns1", "a2", hearsay.MailboxQueryOpts{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -199,17 +199,17 @@ func TestExpireMessages(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := p.CreateNamespace(ctx, agentstate.Namespace{ID: "ns1"}); err != nil {
+	if err := p.CreateNamespace(ctx, hearsay.Namespace{ID: "ns1"}); err != nil {
 		t.Fatal(err)
 	}
 
 	now := time.Now().UTC()
-	_ = p.SendMessage(ctx, "ns1", agentstate.MailboxMessage{MessageID: "m1", From: "a1", To: "a2", Type: agentstate.MailboxTypeNote, Content: "c1", CreatedAt: now, ExpiresAt: now.Add(-time.Second)})
+	_ = p.SendMessage(ctx, "ns1", hearsay.MailboxMessage{MessageID: "m1", From: "a1", To: "a2", Type: hearsay.MailboxTypeNote, Content: "c1", CreatedAt: now, ExpiresAt: now.Add(-time.Second)})
 	if err := p.ExpireMessages(ctx, "ns1", now); err != nil {
 		t.Fatal(err)
 	}
 
-	msgs, err := p.GetMailbox(ctx, "ns1", "a2", agentstate.MailboxQueryOpts{})
+	msgs, err := p.GetMailbox(ctx, "ns1", "a2", hearsay.MailboxQueryOpts{})
 	if err != nil {
 		t.Fatal(err)
 	}

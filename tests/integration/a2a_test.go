@@ -8,16 +8,16 @@ import (
 	"testing"
 	"time"
 
-	"github.com/thunder/agentstate/internal/a2a"
-	"github.com/thunder/agentstate/internal/memory"
-	"github.com/thunder/agentstate/pkg/agentstate"
+	"github.com/gstranger/hearsay/internal/a2a"
+	"github.com/gstranger/hearsay/internal/memory"
+	"github.com/gstranger/hearsay/pkg/hearsay"
 )
 
 func TestA2AEndToEnd(t *testing.T) {
 	p := memory.New()
-	_ = p.CreateNamespace(context.Background(), agentstate.Namespace{ID: "test", CreatedAt: time.Now()})
-	client := agentstate.NewClient(p, "test")
-	cfg := &agentstate.A2AConfig{Addr: "localhost:8081", APIKey: "ak_test"}
+	_ = p.CreateNamespace(context.Background(), hearsay.Namespace{ID: "test", CreatedAt: time.Now()})
+	client := hearsay.NewClient(p, "test")
+	cfg := &hearsay.A2AConfig{Addr: "localhost:8081", APIKey: "ak_test"}
 	mw := &a2a.AuthMiddleware{APIKey: "ak_test"}
 	srv := a2a.NewServer(cfg, client, p, mw, "test")
 
@@ -28,7 +28,7 @@ func TestA2AEndToEnd(t *testing.T) {
 	if rec.Code != 200 { t.Fatalf("agent card: expected 200, got %d", rec.Code) }
 	var card a2a.AgentCard
 	if err := json.Unmarshal(rec.Body.Bytes(), &card); err != nil { t.Fatal(err) }
-	if card.Name != "agentstate-coordinator" { t.Fatal("name mismatch") }
+	if card.Name != "hearsay-coordinator" { t.Fatal("name mismatch") }
 	if len(card.Skills) != 5 { t.Fatalf("expected 5 skills, got %d", len(card.Skills)) }
 
 	// 2. Claim resource
@@ -82,7 +82,7 @@ func TestA2AEndToEnd(t *testing.T) {
 	}
 
 	// 4. Cancel task — create a working task directly so it can be canceled
-	_ = p.CreateTask(context.Background(), "test", &agentstate.A2ATask{
+	_ = p.CreateTask(context.Background(), "test", &hearsay.A2ATask{
 		ID: "task-cancel-1", State: "working", Namespace: "test", CreatedAt: time.Now(),
 	})
 	body, _ = json.Marshal(map[string]any{

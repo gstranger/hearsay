@@ -14,6 +14,14 @@ type taskParams struct {
 	Metadata  map[string]any `json:"metadata,omitempty"`
 }
 
+// SkillResult is returned by executeSkill. It carries the mutated task and any
+// artifacts produced. Synchronous callers (tasks/send) use both fields; streaming
+// callers (tasks/sendSubscribe) use them to emit incremental events.
+type SkillResult struct {
+	Task      *Task
+	Artifacts []Artifact
+}
+
 func (s *Server) handleTasksSend(ctx context.Context, params json.RawMessage) (*JSONRPCResponse, error) {
 	var req taskParams
 	if err := json.Unmarshal(params, &req); err != nil {

@@ -8,7 +8,7 @@ import (
 	"github.com/gstranger/hearsay/pkg/hearsay"
 )
 
-func (s *Server) executeSkill(ctx context.Context, task *Task, msg Message) (*Task, error) {
+func (s *Server) executeSkill(ctx context.Context, task *Task, msg Message) (*SkillResult, error) {
 	params, err := extractParams(msg.Parts)
 	if err != nil {
 		return nil, err
@@ -21,15 +21,15 @@ func (s *Server) executeSkill(ctx context.Context, task *Task, msg Message) (*Ta
 
 	switch params.SkillID {
 	case "claim_resource":
-		return s.skillClaimResource(ctx, task, params)
+		return wrapSkillResult(s.skillClaimResource(ctx, task, params))
 	case "release_resource":
-		return s.skillReleaseResource(ctx, task, params)
+		return wrapSkillResult(s.skillReleaseResource(ctx, task, params))
 	case "check_conflict":
-		return s.skillCheckConflict(ctx, task, params)
+		return wrapSkillResult(s.skillCheckConflict(ctx, task, params))
 	case "query_mailbox":
-		return s.skillQueryMailbox(ctx, task, params)
+		return wrapSkillResult(s.skillQueryMailbox(ctx, task, params))
 	case "send_mailbox":
-		return s.skillSendMailbox(ctx, task, params)
+		return wrapSkillResult(s.skillSendMailbox(ctx, task, params))
 	default:
 		return nil, fmt.Errorf("unknown skill: %s", params.SkillID)
 	}
@@ -107,6 +107,13 @@ func (s *Server) skillSendMailbox(ctx context.Context, task *Task, params *Skill
 		Parts: []Part{{Type: "data", Data: resultJSON}},
 	}}
 	return task, nil
+}
+
+func wrapSkillResult(task *Task, err error) (*SkillResult, error) {
+	if err != nil {
+		return nil, err
+	}
+	return &SkillResult{Task: task, Artifacts: task.Artifacts}, nil
 }
 
 func mustJSON(v any) json.RawMessage {

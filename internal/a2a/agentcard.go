@@ -53,7 +53,7 @@ func GenerateAgentCard(cfg *hearsay.A2AConfig, version string) *AgentCard {
 		Description:      "Resource locking, conflict detection, and mailbox for agent teams",
 		URL:              "http://" + cfg.Addr + "/a2a",
 		Version:          version,
-		Capabilities:     Capabilities{Streaming: false, PushNotifications: false, StateTransitionHistory: false},
+		Capabilities:     Capabilities{Streaming: true, PushNotifications: false, StateTransitionHistory: false},
 		DefaultInputModes:  []string{"text"},
 		DefaultOutputModes: []string{"text", "data"},
 		Skills: []Skill{

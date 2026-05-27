@@ -12,7 +12,7 @@ func TestGenerateAgentCard(t *testing.T) {
 	if card.Name != "hearsay-coordinator" { t.Fatal("name mismatch") }
 	if card.URL != "http://localhost:8081/a2a" { t.Fatalf("url mismatch: got %s", card.URL) }
 	if len(card.Skills) != 5 { t.Fatalf("expected 5 skills, got %d", len(card.Skills)) }
-	if card.Capabilities.Streaming { t.Fatal("streaming should be false in v1") }
+	if !card.Capabilities.Streaming { t.Fatal("streaming should be true") }
 	if card.Authentication == nil { t.Fatal("expected auth") }
 	if len(card.Authentication.Schemes) != 1 || card.Authentication.Schemes[0] != "api-key" {
 		t.Fatalf("expected api-key scheme, got %v", card.Authentication.Schemes)

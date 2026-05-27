@@ -331,6 +331,40 @@ provider = "postgresql"
 
 ---
 
+## Deploy to Cloudflare Workers
+
+hearsay compiles to WebAssembly and runs on Cloudflare Workers with D1 storage, no servers required.
+
+[![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/gstranger/hearsay)
+
+The Deploy to Cloudflare button auto-provisions:
+- A **D1 database** for coordination state (claims, mailbox, A2A tasks, audit log)
+- A **Durable Object** namespace for namespace-scoped sweeping and future push
+- The Go WASM binary, built automatically via `wrangler.toml`'s build command
+
+**After deployment**, agents talk to `https://hearsay.<your-subdomain>.workers.dev`:
+
+```bash
+# Claim a resource via the Worker
+curl https://hearsay.example.workers.dev/ns/my-project/claim \
+  -H "Content-Type: application/json" \
+  -d '{"resource_uri":"file://src/api.go","agent_id":"bot-1","operation":"write","intent":"refactoring"}'
+
+# Stream events via SSE
+curl -N https://hearsay.example.workers.dev/ns/my-project/events
+```
+
+URLs use the pattern `/ns/<namespace>/<endpoint>` — the Worker extracts the namespace from the path and routes to the same REST handlers as the native binary.
+
+| Run your own | File | Purpose |
+|---|---|---|
+| Worker wrapper | `worker.js` | JS entrypoint that loads Go WASM and bridges Cloudflare's `fetch` API |
+| Config | `wrangler.toml` | D1 binding, DO binding, WASM build command |
+| D1 migrations | `migrations/0001_init.sql` | Creates the hearsay schema (same tables as SQLite) |
+| WASM entrypoint | `cmd/hearsay/main_wasm.go` | Go code compiled to WASM, exports `handleRequest(request, d1Binding)` |
+
+---
+
 ## Development
 
 ```bash

@@ -19,24 +19,31 @@ var (
 )
 
 func init() {
-	js.Global().Set("fetch", js.FuncOf(handleFetch))
+	// Export handleRequest so the JS wrapper (worker.js) can call it.
+	js.Global().Set("handleRequest", js.FuncOf(handleRequest))
 }
 
 // main is required by the Go compiler but the program runs entirely
-// via the fetch callback registered in init().
+// via the request handler exported in init().
 func main() {
 	select {}
 }
 
-func handleFetch(this js.Value, args []js.Value) any {
+// handleRequest is called by the JS worker.js wrapper with:
+//
+//	handleRequest(request, d1Binding)
+//
+// args[0]: the Cloudflare Request object
+// args[1]: the D1 binding (HEARSAY_D1) passed explicitly so we don't use global scope
+func handleRequest(this js.Value, args []js.Value) any {
 	request := args[0]
+	d1Binding := args[1]
 	url := request.Get("url").String()
 
 	// Initialize provider on first request
 	if globalProvider == nil {
-		d1Binding := js.Global().Get("HEARSAY_D1")
 		if d1Binding.IsUndefined() {
-			return newResponse(500, `{"error":"HEARSAY_D1 binding not found"}`)
+			return newResponse(500, `{"error":"D1 binding not provided"}`)
 		}
 		globalProvider = d1.New(d1Binding)
 		client := hearsay.NewClient(globalProvider, "default")
@@ -45,8 +52,15 @@ func handleFetch(this js.Value, args []js.Value) any {
 
 	// Extract namespace from URL path. URLs look like:
 	//   /ns/acme-project/claim  → namespace="acme-project", path="/claim"
-	path := strings.TrimPrefix(url, "http://localhost")
-	path = strings.TrimPrefix(path, "https://localhost")
+	path := url
+	// Strip protocol if present
+	path = strings.TrimPrefix(path, "http://")
+	path = strings.TrimPrefix(path, "https://")
+	// Strip host (everything before the first / after protocol)
+	if idx := strings.Index(path, "/"); idx >= 0 {
+		path = path[idx:]
+	}
+
 	parts := strings.SplitN(strings.TrimPrefix(path, "/"), "/", 4)
 	if len(parts) < 3 || parts[0] != "ns" {
 		return newResponse(400, `{"error":"invalid path, expected /ns/<namespace>/..."}`)
@@ -58,8 +72,6 @@ func handleFetch(this js.Value, args []js.Value) any {
 	method := request.Get("method").String()
 	body := ""
 	if request.Get("body").Truthy() {
-		// In WASM, we can't await promises directly. For v1, assume small bodies
-		// where body.text() resolves synchronously via the Cloudflare runtime.
 		bodyPromise := request.Call("text")
 		if bodyPromise.Truthy() && bodyPromise.Type() == js.TypeString {
 			body = bodyPromise.String()

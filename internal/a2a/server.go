@@ -44,6 +44,12 @@ func (s *Server) handleJSONRPC(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Streaming methods handle their own response lifecycle (SSE)
+	if req.Method == "tasks/sendSubscribe" {
+		s.handleTasksSendSubscribe(w, r, req)
+		return
+	}
+
 	var resp *JSONRPCResponse
 	var handlerErr error
 

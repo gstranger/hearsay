@@ -1,0 +1,40 @@
+# Binaries
+agentstate
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Test binary, built with `go test -c`
+*.test
+
+# Output of the go coverage tool
+*.out
+
+# Go vendor directory
+vendor/
+
+# Node modules
+node_modules/
+
+# Local database
+*.db
+.agentstate.db
+
+# Local config with potential secrets
+.agentstate.toml
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Build artifacts
+dist/
+build/

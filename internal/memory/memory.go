@@ -326,6 +326,88 @@ func containsType(types []hearsay.MessageType, t hearsay.MessageType) bool {
 	return false
 }
 
+// SubscribeEvents streams events from the in-memory message log.
+func (p *Provider) SubscribeEvents(ctx context.Context, namespaceID string, since int64) (<-chan hearsay.Event, error) {
+	ch := make(chan hearsay.Event, 100)
+	go func() {
+		defer close(ch)
+
+		// Replay: catch up on events since the given sequence
+		p.mu.RLock()
+		msgs := p.messages[namespaceID]
+		var currentSeq int64
+		for _, m := range msgs {
+			// memory provider uses offset as sequence
+			seq := m.Offset
+			if seq <= since {
+				continue
+			}
+			evt := hearsay.Event{
+				Seq:       seq,
+				Type:      messageTypeToEventType(m.Type),
+				Payload:   m.Payload,
+				Timestamp: m.Timestamp,
+			}
+			select {
+			case ch <- evt:
+				currentSeq = seq
+			case <-ctx.Done():
+				p.mu.RUnlock()
+				return
+			}
+		}
+		since = currentSeq
+		p.mu.RUnlock()
+
+		// Stream: poll for new events
+		for {
+			select {
+			case <-time.After(500 * time.Millisecond):
+			case <-ctx.Done():
+				return
+			}
+
+			p.mu.RLock()
+			msgs := p.messages[namespaceID]
+			for _, m := range msgs {
+				if m.Offset <= since {
+					continue
+				}
+				evt := hearsay.Event{
+					Seq:       m.Offset,
+					Type:      messageTypeToEventType(m.Type),
+					Payload:   m.Payload,
+					Timestamp: m.Timestamp,
+				}
+				select {
+				case ch <- evt:
+					since = m.Offset
+				case <-ctx.Done():
+					p.mu.RUnlock()
+					return
+				}
+			}
+			p.mu.RUnlock()
+		}
+	}()
+	return ch, nil
+}
+
+func messageTypeToEventType(t hearsay.MessageType) hearsay.EventType {
+	switch t {
+	case hearsay.MsgClaim:
+		return hearsay.EventClaim
+	case hearsay.MsgRelease, hearsay.MsgTransfer:
+		return hearsay.EventRelease
+	case hearsay.MsgHeartbeat:
+		return hearsay.EventHeartbeat
+	case hearsay.MsgMailboxSend, hearsay.MsgMailboxRead, hearsay.MsgMailboxArchive:
+		return hearsay.EventMailbox
+	default:
+		return hearsay.EventType(t)
+	}
+}
+
 func (p *Provider) AppendAudit(ctx context.Context, namespaceID string, events []hearsay.AuditEvent) error {
 	p.mu.Lock()
 	defer p.mu.Unlock()

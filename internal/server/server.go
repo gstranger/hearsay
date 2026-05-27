@@ -15,44 +15,65 @@ type Server struct {
 	provider hearsay.Provider
 	locking  bool
 	mux      *http.ServeMux
+	auth     *AuthMiddleware
+	logger   *LoggingMiddleware
 }
 
-func New(client *hearsay.Client, provider hearsay.Provider, locking bool) *Server {
-	s := &Server{client: client, provider: provider, locking: locking, mux: http.NewServeMux()}
-	// Health check
+func New(client *hearsay.Client, provider hearsay.Provider, locking bool, authToken string, logFormat LogFormat) *Server {
+	s := &Server{
+		client:   client,
+		provider: provider,
+		locking:  locking,
+		mux:      http.NewServeMux(),
+		auth:     &AuthMiddleware{Token: authToken},
+		logger:   &LoggingMiddleware{Format: logFormat},
+	}
+	// Read-only endpoints (no auth required)
 	s.mux.HandleFunc("GET /health", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
 	})
-	// Client-facing endpoints
-	s.mux.HandleFunc("POST /claim", s.handleClaim)
-	s.mux.HandleFunc("POST /release", s.handleRelease)
-	s.mux.HandleFunc("POST /heartbeat", s.handleHeartbeat)
 	s.mux.HandleFunc("GET /claims", s.handleQueryClaims)
 	s.mux.HandleFunc("GET /check", s.handleCheck)
-	s.mux.HandleFunc("POST /intent", s.handleIntent)
-	// Mailbox endpoints
-	s.mux.HandleFunc("POST /message", s.handleSendMessage)
 	s.mux.HandleFunc("GET /mailbox", s.handleGetMailbox)
-	s.mux.HandleFunc("POST /message/read", s.handleMarkRead)
-	s.mux.HandleFunc("POST /message/archive", s.handleArchiveMessage)
-	// Provider proxy endpoints (for managed provider)
-	s.mux.HandleFunc("POST /namespaces/create", s.handleCreateNamespace)
-	s.mux.HandleFunc("POST /namespaces/delete", s.handleDeleteNamespace)
-	s.mux.HandleFunc("POST /append", s.handleAppend)
+	// Mutating endpoints (auth required when token is set)
+	s.mux.HandleFunc("POST /claim", s.auth.Wrap(s.handleClaim))
+	s.mux.HandleFunc("POST /release", s.auth.Wrap(s.handleRelease))
+	s.mux.HandleFunc("POST /heartbeat", s.auth.Wrap(s.handleHeartbeat))
+	s.mux.HandleFunc("POST /intent", s.auth.Wrap(s.handleIntent))
+	s.mux.HandleFunc("POST /message", s.auth.Wrap(s.handleSendMessage))
+	s.mux.HandleFunc("POST /message/read", s.auth.Wrap(s.handleMarkRead))
+	s.mux.HandleFunc("POST /message/archive", s.auth.Wrap(s.handleArchiveMessage))
+	// Provider proxy endpoints
+	s.mux.HandleFunc("POST /namespaces/create", s.auth.Wrap(s.handleCreateNamespace))
+	s.mux.HandleFunc("POST /namespaces/delete", s.auth.Wrap(s.handleDeleteNamespace))
+	s.mux.HandleFunc("POST /append", s.auth.Wrap(s.handleAppend))
+	s.mux.HandleFunc("POST /expire", s.auth.Wrap(s.handleReleaseExpired))
+	// Read-only provider endpoints
 	s.mux.HandleFunc("GET /query", s.handleQuery)
 	s.mux.HandleFunc("GET /agents", s.handleAgentState)
-	s.mux.HandleFunc("POST /expire", s.handleReleaseExpired)
 	return s
 }
 
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	s.mux.ServeHTTP(w, r)
+	s.logger.Wrap(s.mux).ServeHTTP(w, r)
 }
 
 func (s *Server) handleClaim(w http.ResponseWriter, r *http.Request) {
 	var req hearsay.ClaimRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	if err := hearsay.ValidateAgentID(req.AgentID); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	if err := hearsay.ValidateResourceURI(req.ResourceURI); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	if err := hearsay.ValidateIntent(req.Intent); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}

@@ -34,6 +34,20 @@ func (s *Server) handleSendMessage(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
+	if err := hearsay.ValidateNamespace(req.Namespace); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	if err := hearsay.ValidateAgentID(req.From); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	if req.To != "" && req.To != "broadcast" {
+		if err := hearsay.ValidateAgentID(req.To); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+	}
 
 	svc := mailbox.New(s.provider)
 	id, err := svc.Send(r.Context(), req.Namespace, req.From, req.To, req.Type, req.Content, req.RelatedClaimID, req.TTLSeconds)

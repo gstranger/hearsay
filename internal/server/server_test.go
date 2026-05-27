@@ -21,7 +21,7 @@ func setupTestServer(t *testing.T) (*Server, func()) {
 		t.Fatal(err)
 	}
 	client := hearsay.NewClient(p, "test")
-	return New(client, p, false), func() {}
+	return New(client, p, false, "", LogFormatText), func() {}
 }
 
 func post(t *testing.T, srv *Server, path, body string) *http.Response {
@@ -36,6 +36,21 @@ func get(t *testing.T, srv *Server, path string) *http.Response {
 	rec := httptest.NewRecorder()
 	srv.ServeHTTP(rec, req)
 	return rec.Result()
+}
+
+func TestServer_AuthRejectsUnauthenticated(t *testing.T) {
+	ctx := context.Background()
+	p := memory.New()
+	p.CreateNamespace(ctx, hearsay.Namespace{ID: "test"})
+	client := hearsay.NewClient(p, "test")
+	srv := New(client, p, false, "secret", LogFormatText)
+
+	req := httptest.NewRequest("POST", "/claim", strings.NewReader(`{}`))
+	rr := httptest.NewRecorder()
+	srv.ServeHTTP(rr, req)
+	if rr.Code != http.StatusUnauthorized {
+		t.Fatalf("expected 401, got %d", rr.Code)
+	}
 }
 
 func TestHandleClaim(t *testing.T) {

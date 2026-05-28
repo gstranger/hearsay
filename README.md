@@ -324,23 +324,35 @@ provider = "postgresql"
               ┌──────────────────┼──────────────────┐
               │                  │                  │
         ┌─────▼─────┐    ┌──────▼──────┐   ┌──────▼──────┐
-        │  SQLite   │    │ PostgreSQL  │   │   Managed   │
-        │ (default) │    │             │   │  (remote)   │
+        │  SQLite   │    │ PostgreSQL  │   │  Managed    │
+        │ (native)  │    │  (native)   │   │  (native)   │
         └───────────┘    └─────────────┘   └─────────────┘
+
+              ┌──────────────────────────────────────────┐
+              │  Cloudflare Workers (WASM target)        │
+              │        │  D1 + Durable Objects           │
+              └──────────────────────────────────────────┘
+```
+
+hearsay compiles from one source tree into two targets:
+- **Native binary** — `go build ./cmd/hearsay` → standalone server (SQLite or PostgreSQL)
+- **WASM Worker** — `GOOS=js GOARCH=wasm go build ./cmd/hearsay` → Cloudflare Worker (D1)
 ```
 
 ---
 
 ## Deploy to Cloudflare Workers
 
-hearsay compiles to WebAssembly and runs on Cloudflare Workers with D1 storage, no servers required.
+hearsay compiles to both a native Go binary **and** WebAssembly — the same source tree, two targets. Deploy to Cloudflare Workers for a zero-ops coordination server with D1 storage.
 
 [![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/gstranger/hearsay)
 
-The Deploy to Cloudflare button auto-provisions:
+**The Deploy button uses the WASM target only.** It auto-provisions:
 - A **D1 database** for coordination state (claims, mailbox, A2A tasks, audit log)
 - A **Durable Object** namespace for namespace-scoped sweeping and future push
-- The Go WASM binary, built automatically via `wrangler.toml`'s build command
+- The **Go WASM binary**, built by `wrangler.toml`'s build command — no server, no binary download
+
+See [`docs/cloudflare-deploy.md`](docs/cloudflare-deploy.md) for manual setup and architecture details.
 
 **After deployment**, agents talk to `https://hearsay.<your-subdomain>.workers.dev`:
 

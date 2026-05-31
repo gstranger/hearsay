@@ -48,10 +48,14 @@ type Skill struct {
 }
 
 func GenerateAgentCard(cfg *hearsay.A2AConfig, version string) *AgentCard {
+	addr := ""
+	if cfg != nil {
+		addr = "http://" + cfg.Addr + "/a2a"
+	}
 	card := &AgentCard{
 		Name:             "hearsay-coordinator",
 		Description:      "Resource locking, conflict detection, and mailbox for agent teams",
-		URL:              "http://" + cfg.Addr + "/a2a",
+		URL:              addr,
 		Version:          version,
 		Capabilities:     Capabilities{Streaming: true, PushNotifications: false, StateTransitionHistory: false},
 		DefaultInputModes:  []string{"text"},
@@ -66,8 +70,10 @@ func GenerateAgentCard(cfg *hearsay.A2AConfig, version string) *AgentCard {
 	}
 
 	var schemes []string
-	if cfg.APIKey != "" { schemes = append(schemes, "api-key") }
-	if cfg.BearerValidatorURL != "" || cfg.BearerJWKSURL != "" { schemes = append(schemes, "Bearer") }
+	if cfg != nil {
+		if cfg.APIKey != "" { schemes = append(schemes, "api-key") }
+		if cfg.BearerValidatorURL != "" || cfg.BearerJWKSURL != "" { schemes = append(schemes, "Bearer") }
+	}
 	if len(schemes) > 0 {
 		card.Authentication = &Authentication{Schemes: schemes}
 	}

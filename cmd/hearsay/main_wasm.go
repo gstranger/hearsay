@@ -8,6 +8,7 @@ import (
 	"strings"
 	"syscall/js"
 
+	"github.com/gstranger/hearsay/internal/a2a"
 	"github.com/gstranger/hearsay/internal/d1"
 	"github.com/gstranger/hearsay/internal/server"
 	"github.com/gstranger/hearsay/pkg/hearsay"
@@ -16,31 +17,22 @@ import (
 var (
 	globalProvider hearsay.Provider
 	globalServer   *server.Server
+	globalA2A      *a2a.Server
 )
 
 func init() {
-	// Export handleRequest so the JS wrapper (worker.js) can call it.
 	js.Global().Set("handleRequest", js.FuncOf(handleRequest))
 }
 
-// main is required by the Go compiler but the program runs entirely
-// via the request handler exported in init().
 func main() {
 	select {}
 }
 
-// handleRequest is called by the JS worker.js wrapper with:
-//
-//	handleRequest(request, d1Binding)
-//
-// args[0]: the Cloudflare Request object
-// args[1]: the D1 binding (HEARSAY_D1) passed explicitly so we don't use global scope
 func handleRequest(this js.Value, args []js.Value) any {
 	request := args[0]
 	d1Binding := args[1]
 	url := request.Get("url").String()
 
-	// Initialize provider on first request
 	if globalProvider == nil {
 		if d1Binding.IsUndefined() {
 			return newResponse(500, `{"error":"D1 binding not provided"}`)
@@ -48,15 +40,16 @@ func handleRequest(this js.Value, args []js.Value) any {
 		globalProvider = d1.New(d1Binding)
 		client := hearsay.NewClient(globalProvider, "default")
 		globalServer = server.New(client, globalProvider, false, "", server.LogFormatText, 0, 0, hearsay.AuditOff, "default")
+
+		// A2A server — uses the same provider for task storage.
+		// Auth is optional on Workers (Cloudflare handles edge auth).
+		globalA2A = a2a.NewServer(nil, client, globalProvider, nil, "default")
 	}
 
-	// Extract namespace from URL path. URLs look like:
-	//   /ns/acme-project/claim  → namespace="acme-project", path="/claim"
+	// Parse URL: /ns/<namespace>/...rest-path...
 	path := url
-	// Strip protocol if present
 	path = strings.TrimPrefix(path, "http://")
 	path = strings.TrimPrefix(path, "https://")
-	// Strip host (everything before the first / after protocol)
 	if idx := strings.Index(path, "/"); idx >= 0 {
 		path = path[idx:]
 	}
@@ -68,7 +61,7 @@ func handleRequest(this js.Value, args []js.Value) any {
 	namespace := parts[1]
 	remainingPath := "/" + strings.Join(parts[2:], "/")
 
-	// Build an http.Request from the JS Request
+	// Build http.Request
 	method := request.Get("method").String()
 	body := ""
 	if request.Get("body").Truthy() {
@@ -83,7 +76,6 @@ func handleRequest(this js.Value, args []js.Value) any {
 		return newResponse(400, `{"error":"invalid request"}`)
 	}
 
-	// Copy headers
 	headers := request.Get("headers")
 	if headers.Truthy() {
 		headerIter := headers.Call("entries")
@@ -99,21 +91,27 @@ func handleRequest(this js.Value, args []js.Value) any {
 		}
 	}
 
-	// Add namespace as query parameter so handlers can read it via r.URL.Query().Get("namespace")
 	goReq.Header.Set("X-Hearsay-Namespace", namespace)
 	goReq.URL.RawQuery = "namespace=" + namespace
 
-	// Serve via shared server.Server
 	rec := &wasmResponseRecorder{
 		headers:    http.Header{},
 		statusCode: 200,
 	}
-	globalServer.ServeHTTP(rec, goReq)
+
+	// Route: A2A paths go to the A2A server, everything else to REST
+	isA2A := remainingPath == "/" && method == http.MethodPost ||
+		remainingPath == "/.well-known/agent.json" && method == http.MethodGet
+
+	if isA2A {
+		globalA2A.ServeHTTP(rec, goReq)
+	} else {
+		globalServer.ServeHTTP(rec, goReq)
+	}
 
 	return newResponse(rec.statusCode, rec.body.String())
 }
 
-// wasmResponseRecorder implements http.ResponseWriter for WASM.
 type wasmResponseRecorder struct {
 	headers    http.Header
 	body       strings.Builder

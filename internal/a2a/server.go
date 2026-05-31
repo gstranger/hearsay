@@ -89,4 +89,9 @@ func (s *Server) writeError(w http.ResponseWriter, id any, code int, message str
 	json.NewEncoder(w).Encode(resp)
 }
 
-func (s *Server) Addr() string { return s.cfg.Addr }
+func (s *Server) Addr() string {
+	if s.cfg != nil {
+		return s.cfg.Addr
+	}
+	return ""
+}

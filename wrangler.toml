@@ -1,32 +1,15 @@
 #:schema node
 name = "hearsay"
 main = "worker.js"
-compatibility_date = "2026-05-26"
+compatibility_date = "2026-06-01"
+compatibility_flags = ["nodejs_compat"]
 
 # D1 database for coordination state (claims, mailbox, A2A tasks, audit log)
 [[d1_databases]]
 binding = "HEARSAY_D1"
 database_name = "hearsay-db"
-database_id = "hearsay-db-id"
+database_id = "07fbbaa9-34b3-4210-8813-a27b36c12961"
 
-# Durable Object for the CoordinatorDO class (namespace-scoped sweeper, future request routing)
-[[durable_objects]]
-class_name = "CoordinatorDO"
-
-[[durable_objects.bindings]]
-name = "COORDINATOR_DO"
-class_name = "CoordinatorDO"
-
-# Build: compile Go to WASM, copy wasm_exec.js, run D1 migrations
-[build]
-command = '''
-npx wrangler d1 migrations apply HEARSAY_D1 --remote &&
-GOOS=js GOARCH=wasm go build -o hearsay.wasm ./cmd/hearsay &&
-cp "$(go env GOROOT)/lib/wasm/wasm_exec.js" .
-'''
-
-[build.upload]
-main = "worker.js"
-
-[env.production]
-compatibility_date = "2026-05-26"
+# Environment variables
+[vars]
+HEARSAY_VERSION = "1.0.0"

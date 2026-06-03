@@ -27,6 +27,17 @@ func TestGenerateAgentCardBearerOnly(t *testing.T) {
 	}
 }
 
+func TestGenerateAgentCardWASMNoStreaming(t *testing.T) {
+	// cfg == nil signals WASM/Worker runtime — SSE is not available.
+	card := GenerateAgentCard(nil, "1.0.0")
+	if card.Capabilities.Streaming {
+		t.Fatal("streaming should be false in WASM/Worker runtime")
+	}
+	if card.URL != "" {
+		t.Fatalf("URL should be empty when cfg is nil, got %q", card.URL)
+	}
+}
+
 func TestGenerateAgentCardBothAuth(t *testing.T) {
 	cfg := &hearsay.A2AConfig{Addr: "localhost:8081", APIKey: "secret", BearerValidatorURL: "https://auth.example.com/verify"}
 	card := GenerateAgentCard(cfg, "1.0.0")

@@ -36,6 +36,33 @@ func TestServerAgentCard(t *testing.T) {
 	}
 }
 
+func TestServerRejectsSendSubscribeOnWASM(t *testing.T) {
+	// cfg == nil signals WASM/Worker runtime — sendSubscribe must be
+	// rejected with A2A UnsupportedOperationError (-32004) before the
+	// SSE handler runs (which would otherwise fail because the JS
+	// response recorder is not an http.Flusher).
+	p := memory.New()
+	_ = p.CreateNamespace(context.Background(), hearsay.Namespace{ID: "test", CreatedAt: time.Now()})
+	client := hearsay.NewClient(p, "test")
+	srv := NewServer(nil, client, p, nil, "test")
+
+	body, _ := json.Marshal(map[string]any{
+		"jsonrpc": "2.0", "id": 1, "method": "tasks/sendSubscribe",
+		"params": map[string]any{"id": "t1", "message": map[string]any{"role": "user"}},
+	})
+	req := httptest.NewRequest("POST", "/", bytes.NewReader(body))
+	rec := httptest.NewRecorder()
+	srv.ServeHTTP(rec, req)
+
+	var resp JSONRPCResponse
+	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if resp.Error == nil || resp.Error.Code != -32004 {
+		t.Fatalf("expected UnsupportedOperationError (-32004), got %+v", resp.Error)
+	}
+}
+
 func TestServerJSONRPC(t *testing.T) {
 	cfg := &hearsay.A2AConfig{Addr: "localhost:8081", APIKey: "ak"}
 	p := memory.New()

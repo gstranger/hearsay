@@ -44,8 +44,15 @@ func (s *Server) handleJSONRPC(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Streaming methods handle their own response lifecycle (SSE)
+	// Streaming methods handle their own response lifecycle (SSE).
+	// WASM/Worker runtimes (cfg == nil) cannot stream — no http.Flusher
+	// support — so we reject with A2A UnsupportedOperationError (-32004),
+	// matching the streaming:false advertised in the agent card.
 	if req.Method == "tasks/sendSubscribe" {
+		if s.cfg == nil {
+			s.writeError(w, req.ID, -32004, "Streaming not supported in this runtime; use tasks/send")
+			return
+		}
 		s.handleTasksSendSubscribe(w, r, req)
 		return
 	}

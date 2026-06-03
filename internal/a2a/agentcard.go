@@ -49,15 +49,19 @@ type Skill struct {
 
 func GenerateAgentCard(cfg *hearsay.A2AConfig, version string) *AgentCard {
 	addr := ""
+	streaming := true
 	if cfg != nil {
 		addr = "http://" + cfg.Addr + "/a2a"
+	} else {
+		// No config: WASM/Worker runtime — SSE streaming not available (no Flusher support).
+		streaming = false
 	}
 	card := &AgentCard{
 		Name:             "hearsay-coordinator",
 		Description:      "Resource locking, conflict detection, and mailbox for agent teams",
 		URL:              addr,
 		Version:          version,
-		Capabilities:     Capabilities{Streaming: true, PushNotifications: false, StateTransitionHistory: false},
+		Capabilities:     Capabilities{Streaming: streaming, PushNotifications: false, StateTransitionHistory: false},
 		DefaultInputModes:  []string{"text"},
 		DefaultOutputModes: []string{"text", "data"},
 		Skills: []Skill{

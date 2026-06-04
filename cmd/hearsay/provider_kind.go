@@ -5,8 +5,14 @@ package main
 type ProviderKind int
 
 const (
+	// ProviderNone signals no backend is configured; the caller should
+	// respond with HTTP 500.
 	ProviderNone ProviderKind = iota
+	// ProviderManaged selects the remote HTTP provider (internal/managed),
+	// driven by HEARSAY_MANAGED_URL.
 	ProviderManaged
+	// ProviderD1 selects the Cloudflare D1 provider (internal/d1), driven
+	// by the Worker's HEARSAY_D1 binding.
 	ProviderD1
 )
 

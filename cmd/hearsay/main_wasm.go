@@ -145,11 +145,12 @@ func newResponse(statusCode int, body string) js.Value {
 	return js.Global().Get("Response").New(body, init)
 }
 
-// safeString returns v.String() when v is a populated JS string,
-// or "" when v is undefined/null. Avoids a panic when an env var
-// was not configured on the Worker.
+// safeString returns v.String() when v is a JS string, or "" otherwise
+// (undefined, null, or any non-string value). The type guard prevents a
+// non-string env binding from silently producing a garbage URL — empty
+// is honest, "[object Object]" is not.
 func safeString(v js.Value) string {
-	if v.IsUndefined() || v.IsNull() {
+	if v.Type() != js.TypeString {
 		return ""
 	}
 	return v.String()

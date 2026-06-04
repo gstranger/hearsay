@@ -306,74 +306,52 @@ provider = "postgresql"
 
 ## Architecture
 
-```
-┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐
-│   Cursor IDE    │     │  TypeScript SDK │     │  External A2A   │
-│   Extension     │     │   (REST API)    │     │    Agents       │
-└────────┬────────┘     └────────┬────────┘     └────────┬────────┘
-         │                       │                       │
-         │ REST (:8080)          │ REST (:8080)          │ JSON-RPC (:8081)
-         │                       │                       │
-         └───────────────────────┼───────────────────────┘
-                                 │
-                    ┌────────────▼────────────┐
-                    │      hearsay         │
-                    │   (Go library/binary)   │
-                    └────────────┬────────────┘
-                                 │
-              ┌──────────────────┼──────────────────┐
-              │                  │                  │
-        ┌─────▼─────┐    ┌──────▼──────┐   ┌──────▼──────┐
-        │  SQLite   │    │ PostgreSQL  │   │  Managed    │
-        │ (native)  │    │  (native)   │   │  (native)   │
-        └───────────┘    └─────────────┘   └─────────────┘
+hearsay compiles from one source tree into two runtime targets that share the same coordination engine:
 
-              ┌──────────────────────────────────────────┐
-              │  Cloudflare Workers (WASM target)        │
-              │        │  D1 + Durable Objects           │
-              └──────────────────────────────────────────┘
+```
+Native target          WASM (Cloudflare Workers) target
+─────────────          ────────────────────────────────
+SQLite                 D1
+PostgreSQL             Managed (HTTP → remote hearsay)
+Managed
+(in-memory, tests)
 ```
 
-hearsay compiles from one source tree into two targets:
-- **Native binary** — `go build ./cmd/hearsay` → standalone server (SQLite or PostgreSQL)
-- **WASM Worker** — `GOOS=js GOARCH=wasm go build ./cmd/hearsay` → Cloudflare Worker (D1)
-```
+- **Native binary** — `go build ./cmd/hearsay` → standalone server backed by SQLite, PostgreSQL, or a managed remote.
+- **WASM Worker** — `GOOS=js GOARCH=wasm go build ./cmd/hearsay` → Cloudflare Worker backed by D1 (default) or a managed remote (HEARSAY_MANAGED_URL).
+
+### Runtime feature matrix
+
+| Feature | Native | Workers |
+|---|---|---|
+| REST API | ✓ | ✓ |
+| A2A JSON-RPC (`tasks/send`) | ✓ | ✓ |
+| A2A SSE (`tasks/sendSubscribe`) | ✓ | ✗ |
+| Background sweeper | ✓ | ✗ (stub) |
+| TLS | ✓ | edge (CF) |
 
 ---
 
 ## Deploy to Cloudflare Workers
 
-hearsay compiles to both a native Go binary **and** WebAssembly — the same source tree, two targets. Deploy to Cloudflare Workers for a zero-ops coordination server with D1 storage.
-
-[![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/gstranger/hearsay)
-
-**The Deploy button uses the WASM target only.** It auto-provisions:
-- A **D1 database** for coordination state (claims, mailbox, A2A tasks, audit log)
-- A **Durable Object** namespace for namespace-scoped sweeping and future push
-- The **Go WASM binary**, built by `wrangler.toml`'s build command — no server, no binary download
-
-See [`docs/cloudflare-deploy.md`](docs/cloudflare-deploy.md) for manual setup and architecture details.
-
-**After deployment**, agents talk to `https://hearsay.<your-subdomain>.workers.dev`:
+Three commands from a clean clone (requires a paid Workers plan — the WASM is ~6 MB, over the 3 MB free-tier limit):
 
 ```bash
-# Claim a resource via the Worker
-curl https://hearsay.example.workers.dev/ns/my-project/claim \
-  -H "Content-Type: application/json" \
-  -d '{"resource_uri":"file://src/api.go","agent_id":"bot-1","operation":"write","intent":"refactoring"}'
-
-# Stream events via SSE
-curl -N https://hearsay.example.workers.dev/ns/my-project/events
+wrangler d1 create hearsay-db          # copy the returned id
+# paste id into wrangler.toml database_id
+wrangler deploy
 ```
 
-URLs use the pattern `/ns/<namespace>/<endpoint>` — the Worker extracts the namespace from the path and routes to the same REST handlers as the native binary.
+The `[build]` block in `wrangler.toml` runs `wrangler d1 migrations apply --remote` then `GOOS=js GOARCH=wasm go build` then copies `wasm_exec.js` — no manual steps.
 
-| Run your own | File | Purpose |
-|---|---|---|
-| Worker wrapper | `worker.js` | JS entrypoint that loads Go WASM and bridges Cloudflare's `fetch` API |
-| Config | `wrangler.toml` | D1 binding, DO binding, WASM build command |
-| D1 migrations | `migrations/0001_init.sql` | Creates the hearsay schema (same tables as SQLite) |
-| WASM entrypoint | `cmd/hearsay/main_wasm.go` | Go code compiled to WASM, exports `handleRequest(request, d1Binding)` |
+See [`docs/cloudflare-deploy.md`](docs/cloudflare-deploy.md) for prerequisites, the alternative managed-remote storage path, the runtime limitations (no SSE), and Deploy-to-Cloudflare button status.
+
+| File | Purpose |
+|---|---|
+| `worker.js` | JS entrypoint — loads Go WASM, bridges Cloudflare's `fetch` API |
+| `wrangler.toml` | Worker config — D1 binding, build command, env vars |
+| `migrations/0001_init.sql` | D1 schema (same tables as SQLite) |
+| `cmd/hearsay/main_wasm.go` | Go code compiled to WASM — exports `handleRequest(request, d1, managedURL, managedToken)` |
 
 ---
 

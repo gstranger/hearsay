@@ -10,6 +10,7 @@ import (
 
 	"github.com/gstranger/hearsay/internal/a2a"
 	"github.com/gstranger/hearsay/internal/d1"
+	"github.com/gstranger/hearsay/internal/managed"
 	"github.com/gstranger/hearsay/internal/server"
 	"github.com/gstranger/hearsay/pkg/hearsay"
 )
@@ -29,15 +30,26 @@ func main() {
 }
 
 func handleRequest(this js.Value, args []js.Value) any {
+	// Argument contract (set by worker.js, load-bearing):
+	//   args[0] = Request
+	//   args[1] = D1 binding (may be undefined)
+	//   args[2] = HEARSAY_MANAGED_URL string (may be undefined)
+	//   args[3] = HEARSAY_MANAGED_TOKEN string (may be undefined)
 	request := args[0]
 	d1Binding := args[1]
+	managedURL := safeString(args[2])
+	managedToken := safeString(args[3])
 	url := request.Get("url").String()
 
 	if globalProvider == nil {
-		if d1Binding.IsUndefined() {
-			return newResponse(500, `{"error":"D1 binding not provided"}`)
+		switch pickProviderKind(managedURL, d1Binding.Truthy()) {
+		case ProviderManaged:
+			globalProvider = managed.New(managedURL, managedToken)
+		case ProviderD1:
+			globalProvider = d1.New(d1Binding)
+		default:
+			return newResponse(500, `{"error":"no provider configured: set HEARSAY_D1 binding or HEARSAY_MANAGED_URL"}`)
 		}
-		globalProvider = d1.New(d1Binding)
 		client := hearsay.NewClient(globalProvider, "default")
 		globalServer = server.New(client, globalProvider, false, "", server.LogFormatText, 0, 0, hearsay.AuditOff, "default")
 
@@ -131,4 +143,15 @@ func newResponse(statusCode int, body string) js.Value {
 	init.Set("headers", headers)
 
 	return js.Global().Get("Response").New(body, init)
+}
+
+// safeString returns v.String() when v is a JS string, or "" otherwise
+// (undefined, null, or any non-string value). The type guard prevents a
+// non-string env binding from silently producing a garbage URL — empty
+// is honest, "[object Object]" is not.
+func safeString(v js.Value) string {
+	if v.Type() != js.TypeString {
+		return ""
+	}
+	return v.String()
 }

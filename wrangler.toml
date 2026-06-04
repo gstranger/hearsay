@@ -4,12 +4,22 @@ main = "worker.js"
 compatibility_date = "2026-06-01"
 compatibility_flags = ["nodejs_compat"]
 
-# D1 database for coordination state (claims, mailbox, A2A tasks, audit log)
+# D1 database for coordination state (claims, mailbox, A2A tasks, audit log).
+# Run `wrangler d1 create hearsay-db` and paste the returned id below.
 [[d1_databases]]
 binding = "HEARSAY_D1"
 database_name = "hearsay-db"
-database_id = "07fbbaa9-34b3-4210-8813-a27b36c12961"
+database_id = "REPLACE_WITH_YOUR_D1_ID"
+migrations_dir = "migrations"
 
-# Environment variables
+# Build: apply D1 migrations, compile Go to WASM, stage wasm_exec.js.
+# Requires Go 1.24+ and `wrangler login` (or CLOUDFLARE_API_TOKEN in CI).
+[build]
+command = """
+npx wrangler d1 migrations apply HEARSAY_D1 --remote && \
+GOOS=js GOARCH=wasm go build -o hearsay.wasm ./cmd/hearsay && \
+cp "$(go env GOROOT)/lib/wasm/wasm_exec.js" .
+"""
+
 [vars]
 HEARSAY_VERSION = "1.0.0"

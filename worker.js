@@ -16,6 +16,11 @@ export default {
         { status: 503, headers: { 'Content-Type': 'application/json', 'Retry-After': '2' } },
       );
     }
-    return globalThis.handleRequest(request, env.HEARSAY_D1);
+    return globalThis.handleRequest(
+      request,
+      env.HEARSAY_D1,
+      env.HEARSAY_MANAGED_URL,
+      env.HEARSAY_MANAGED_TOKEN,
+    );
   },
 };
